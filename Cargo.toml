@@ -2,5 +2,15 @@
 name = "padfoot"
 version = "0.1.0"
 authors = ["David Baynard"]
+description = "Stitch together pdfs"
+homepage = "https://github.com/dbaynard/padfoot"
+repository = "https://github.com/dbaynard/padfoot"
+readme = "README.md"
+license = "BSD2"
+
+[[bin]]
+name = "padfoot"
+path = "src/main.rs"
 
 [dependencies]
+lopdf = "0.15.2"
