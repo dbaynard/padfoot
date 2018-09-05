@@ -68,36 +68,36 @@ mod parsers {
     use combine::*;
     use combine::parser::char::*;
 
-    fn page_range<I>() -> impl Parser<Input = I, Output = (usize, usize)>
-        where I: Stream<Item = char>,
-              <I as StreamOnce>::Error: ParseError<
-                  <I as StreamOnce>::Item,
-                  <I as StreamOnce>::Range,
-                  <I as StreamOnce>::Position,
-              >,
-              <I as StreamOnce>::Error: From<&'static str>,
+    macro_rules! make_parser {
+        ($name:ident, $output:ty, $body:block) => (
+            fn $name<I>() -> impl Parser<Input = I, Output = $output>
+                where I: Stream<Item = char>,
+                      <I as StreamOnce>::Error: ParseError<
+                          <I as StreamOnce>::Item,
+                          <I as StreamOnce>::Range,
+                          <I as StreamOnce>::Position,
+                      >,
+                      <I as StreamOnce>::Error: From<&'static str>,
+            $body
+        )
+    }
+
+    make_parser!(page_range, (usize, usize),
     {
         let page_range = number()
             .skip(char('-'))
             .and(number());
         page_range
-    }
+    });
 
-    fn number<I>() -> impl Parser<Input = I, Output = usize>
-        where I: Stream<Item = char>,
-              <I as StreamOnce>::Error: ParseError<
-                  <I as StreamOnce>::Item,
-                  <I as StreamOnce>::Range,
-                  <I as StreamOnce>::Position,
-              >,
-              <I as StreamOnce>::Error: From<&'static str>,
+    make_parser!(number, usize,
     {
         many1(digit())
             .map(as_string)
             .flat_map(|x| str::parse(&x)
                 .or(Err("Couldn’t parse number from digits".into()))
                 )
-    }
+    });
 
     fn as_string(v: Vec<char>) -> String {
         v.into_iter().collect()
