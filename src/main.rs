@@ -97,7 +97,8 @@ mod parsers {
 
     make_parser!(path_buf, PathBuf,
     {
-        many1(any())
+        not_followed_by(string("output"))
+            .with(many1(any()))
             .map(|x: String| PathBuf::from(&x))
     });
 
