@@ -21,16 +21,37 @@ fn main() {
 
 /// # Options
 #[derive(Debug, StructOpt)]
-enum Opt {
+struct Opt {
+    /// Command
+    #[structopt(subcommand)]
+    cmd: OptCmd,
+}
+
+#[derive(Debug, StructOpt)]
+enum OptCmd {
     #[structopt(name = "cat")]
     Cat {
-        /// Input description
-        #[structopt(parse(try_from_str = "parse_input_element"))]
-        inputs: Vec<InputElement>,
-        /// Output file, if present (otherwise stdout)
-        #[structopt(raw(last = "true"), parse(from_os_str))]
-        output: Option<PathBuf>,
+        #[structopt(flatten)]
+        inputs: Inputs,
+        #[structopt(subcommand)]
+        output: Option<OutputCmd>,
     }
+}
+
+#[derive(Debug, StructOpt)]
+struct Inputs {
+    /// Input description
+    #[structopt(parse(try_from_str = "parse_input_element"))]
+    inputs: Vec<InputElement>,
+}
+
+#[derive(Debug, StructOpt)]
+enum OutputCmd {
+    #[structopt(name = "output")]
+    Output {
+        #[structopt(parse(from_os_str))]
+        outfile: PathBuf,
+    },
 }
 
 #[derive(Debug)]
@@ -77,8 +98,7 @@ mod parsers {
 
     make_parser!(path_buf, PathBuf,
     {
-        not_followed_by(string("output"))
-            .with(many1(any()))
+        many1(any())
             .map(|x: String| PathBuf::from(&x))
     });
 
