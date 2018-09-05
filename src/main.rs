@@ -5,15 +5,11 @@
 extern crate structopt;
 use structopt::StructOpt;
 use std::ops::RangeInclusive;
-use std::path::Path;
 use std::path::PathBuf;
-use std::str::FromStr;
 
 extern crate combine;
 
 extern crate padfoot;
-use padfoot::*;
-use padfoot::errors::*;
 
 use parsers::*;
 
@@ -25,30 +21,15 @@ fn main() {
 
 /// # Options
 #[derive(Debug, StructOpt)]
-struct Opt {
-    /// Operation
-    operation: Operation,
-    /// Input description
-    #[structopt(parse(try_from_str = "parse_input_element"))]
-    inputs: Vec<InputElement>,
-    /// Output file, if present (otherwise stdout)
-    #[structopt(raw(last = "true"), parse(from_os_str))]
-    output: Option<PathBuf>,
-}
-
-#[derive(Debug)]
-enum Operation {
-    Cat,
-}
-
-impl FromStr for Operation {
-    type Err = Error;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
-            "cat" => Ok(Operation::Cat),
-            _ => Err("Couldn’t identify operation".into()),
-        }
+enum Opt {
+    #[structopt(name = "cat")]
+    Cat {
+        /// Input description
+        #[structopt(parse(try_from_str = "parse_input_element"))]
+        inputs: Vec<InputElement>,
+        /// Output file, if present (otherwise stdout)
+        #[structopt(raw(last = "true"), parse(from_os_str))]
+        output: Option<PathBuf>,
     }
 }
 
@@ -60,7 +41,6 @@ pub enum InputElement {
 
 mod parsers {
     use combine::Parser;
-    use combine::error::StringStreamError;
     use combine::*;
     use combine::parser::char::*;
     use std::path::PathBuf;
