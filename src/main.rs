@@ -16,20 +16,20 @@ use padfoot::{
 use options::*;
 
 fn main() -> Result<()> {
-    let opt = Opt::from_args();
+    let mut opt = Opt::from_args();
 
-    let cmd = process_options(opt)?;
+    let cmd = process_options(&mut opt)?;
 
     println!("{:?}", cmd);
 
     Ok(())
 }
 
-fn process_options(opt: Opt) -> Result<Command> {
+fn process_options(opt: &mut Opt) -> Result<Command> {
 
     match opt.cmd {
 
-        OptCmd::Cat{mut inputs, output} => match output {
+        OptCmd::Cat{ref mut inputs, ref output} => match output {
 
             Some(OutputCmd::Output{outfile}) => {
                 let inputs = group_inputs(&inputs.inputs)?;
