@@ -61,13 +61,18 @@ pub enum InputElement {
 }
 
 mod parsers {
-    use combine::Parser;
-    use combine::*;
-    use combine::parser::char::*;
+    use combine::{
+        *,
+        char::*,
+    };
+
     use std::path::PathBuf;
+
     use padfoot::errors::Error;
+
     use InputElement;
 
+    /// Create a parser. This simply handles the messy, messy types.
     macro_rules! make_parser {
         ($name:ident, $output:ty, $body:block) => (
             fn $name<'a, I>() -> impl Parser<Input = I, Output = $output>
@@ -77,11 +82,11 @@ mod parsers {
                           <I as StreamOnce>::Range,
                           <I as StreamOnce>::Position,
                       >,
-                      //<I as StreamOnce>::Error: From<&'a str>,
             $body
         )
     }
 
+    /// Parse a single input element
     pub fn parse_input_element(i: &str) -> Result<InputElement, Error> {
         let (parsed, _) = input_element().parse(i)
             .or(Err("Couldn’t parse input element"))?;
@@ -91,31 +96,31 @@ mod parsers {
     make_parser!(input_element, InputElement,
     {
         choice!(
-            page_range().map(|(f,t)| InputElement::PageRange(f ..= t)),
+            try(inclusive_range()).map(|(f,t)| InputElement::PageRange(f ..= t)),
             path_buf().map(InputElement::File)
-        )
+        ).message("Couldn’t parse input element")
     });
 
     make_parser!(path_buf, PathBuf,
     {
         many1(any())
             .map(|x: String| PathBuf::from(&x))
+            .message("Couldn’t parse potential path")
     });
 
-    make_parser!(page_range, (usize, usize),
+    make_parser!(inclusive_range, (usize, usize),
     {
-        let page_range = number()
+        let inclusive_range = number()
             .skip(char('-'))
             .and(number());
-        page_range
+        inclusive_range
+            .message("Couldn’t parse inclusive range")
     });
 
     make_parser!(number, usize,
     {
-        many1(digit())
-            .map(|x: String| x.parse().unwrap()
-                //.or(Err("Couldn’t parse number from digits"))
-            )
+        from_str(many1::<String, _>(digit()))
+            .message("Couldn’t parse number from digits")
     });
 
 }
