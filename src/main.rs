@@ -8,13 +8,70 @@ use structopt::StructOpt;
 extern crate combine;
 
 extern crate padfoot;
+use padfoot::{
+    *,
+    errors::*,
+};
 
 use options::*;
 
-fn main() {
+fn main() -> Result<()> {
     let opt = Opt::from_args();
 
-    println!("{:?}", opt)
+    let cmd = process_options(opt)?;
+
+    println!("{:?}", cmd);
+
+    Ok(())
+}
+
+fn process_options(opt: Opt) -> Result<Command> {
+
+    match opt.cmd {
+
+        OptCmd::Cat{mut inputs, output} => match output {
+
+            Some(OutputCmd::Output{outfile}) => {
+                let inputs = group_inputs(&inputs.inputs)?;
+                let outfile = PDFName::new(&outfile);
+                Ok(Command::Sel(Sel{inputs, outfile}))
+            },
+
+            None => {
+                if let Some(InputElement::File(outf)) = inputs.inputs.pop() {
+                    let inputs = group_inputs(&inputs.inputs)?;
+                    let outfile = PDFName::new(&outf);
+                    Ok(Command::Sel(Sel{inputs, outfile}))
+                } else {
+                    Err("Could not identify the output file.".into())
+                }
+            },
+
+        }
+    }
+}
+
+fn group_inputs(is: &[InputElement]) -> Result<Vec<PDFPages<PDFName>>> {
+
+    is.iter().fold( Ok(vec!()), |mut rz, i| match i {
+
+        InputElement::File(filepath) => {
+            let _ = rz.as_mut().map(|z| z.push(
+                PDFPages::new(
+                    PDFName::new(filepath)
+                )
+            ));
+            rz
+        },
+
+        InputElement::PageRange(range) => {
+            let _ = rz.as_mut().map(|z| z.last_mut()
+                .map(|l| l.push_range(range))
+            );
+            rz
+        },
+
+    })
 }
 
 /// StructOpt option types corresponding to the CLI interface
@@ -31,11 +88,11 @@ mod options {
     pub struct Opt {
         /// Command
         #[structopt(subcommand)]
-        cmd: OptCmd,
+        pub cmd: OptCmd,
     }
 
     #[derive(Debug, StructOpt)]
-    enum OptCmd {
+    pub enum OptCmd {
         #[structopt(name = "cat")]
         Cat {
             #[structopt(flatten)]
@@ -46,14 +103,14 @@ mod options {
     }
 
     #[derive(Debug, StructOpt)]
-    struct Inputs {
+    pub struct Inputs {
         /// Input description
         #[structopt(parse(try_from_str = "parse_input_element"))]
-        inputs: Vec<InputElement>,
+        pub inputs: Vec<InputElement>,
     }
 
     #[derive(Debug, StructOpt)]
-    enum OutputCmd {
+    pub enum OutputCmd {
         #[structopt(name = "output")]
         Output {
             #[structopt(parse(from_os_str))]

@@ -9,3 +9,9 @@ use errors::*;
 
 mod sel;
 pub use sel::*;
+
+/// The commands supplied to the library
+#[derive(Debug)]
+pub enum Command {
+    Sel(InputSel),
+}
