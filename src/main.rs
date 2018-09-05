@@ -4,7 +4,7 @@
 #[macro_use]
 extern crate structopt;
 use structopt::StructOpt;
-use std::ops::Range;
+use std::ops::RangeInclusive;
 use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -14,6 +14,8 @@ extern crate combine;
 extern crate padfoot;
 use padfoot::*;
 use padfoot::errors::*;
+
+use parsers::*;
 
 fn main() {
     let opt = Opt::from_args();
@@ -27,6 +29,7 @@ struct Opt {
     /// Operation
     operation: Operation,
     /// Input description
+    #[structopt(parse(try_from_str = "parse_input_element"))]
     inputs: Vec<InputElement>,
     /// Output file, if present (otherwise stdout)
     #[structopt(raw(last = "true"), parse(from_os_str))]
@@ -50,37 +53,53 @@ impl FromStr for Operation {
 }
 
 #[derive(Debug)]
-enum InputElement {
-    File(&'static Path),
-    PageRange(Range<usize>),
-}
-
-impl FromStr for InputElement {
-    type Err = Error;
-
-    fn from_str(_s: &str) -> std::result::Result<Self, Self::Err> {
-        Err("Couldn’t discern input".into())
-    }
+pub enum InputElement {
+    File(PathBuf),
+    PageRange(RangeInclusive<usize>),
 }
 
 mod parsers {
     use combine::Parser;
+    use combine::error::StringStreamError;
     use combine::*;
     use combine::parser::char::*;
+    use std::path::PathBuf;
+    use padfoot::errors::Error;
+    use InputElement;
 
     macro_rules! make_parser {
         ($name:ident, $output:ty, $body:block) => (
-            fn $name<I>() -> impl Parser<Input = I, Output = $output>
+            fn $name<'a, I>() -> impl Parser<Input = I, Output = $output>
                 where I: Stream<Item = char>,
                       <I as StreamOnce>::Error: ParseError<
                           <I as StreamOnce>::Item,
                           <I as StreamOnce>::Range,
                           <I as StreamOnce>::Position,
                       >,
-                      <I as StreamOnce>::Error: From<&'static str>,
+                      //<I as StreamOnce>::Error: From<&'a str>,
             $body
         )
     }
+
+    pub fn parse_input_element(i: &str) -> Result<InputElement, Error> {
+        let (parsed, _) = input_element().parse(i)
+            .or(Err("Couldn’t parse input element"))?;
+        Ok(parsed)
+    }
+
+    make_parser!(input_element, InputElement,
+    {
+        choice!(
+            page_range().map(|(f,t)| InputElement::PageRange(f ..= t)),
+            path_buf().map(InputElement::File)
+        )
+    });
+
+    make_parser!(path_buf, PathBuf,
+    {
+        many1(any())
+            .map(|x: String| PathBuf::from(&x))
+    });
 
     make_parser!(page_range, (usize, usize),
     {
@@ -93,13 +112,9 @@ mod parsers {
     make_parser!(number, usize,
     {
         many1(digit())
-            .map(as_string)
-            .flat_map(|x| str::parse(&x)
-                .or(Err("Couldn’t parse number from digits".into()))
-                )
+            .map(|x: String| x.parse().unwrap()
+                //.or(Err("Couldn’t parse number from digits"))
+            )
     });
 
-    fn as_string(v: Vec<char>) -> String {
-        v.into_iter().collect()
-    }
 }
