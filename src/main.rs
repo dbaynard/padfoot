@@ -4,14 +4,12 @@
 #[macro_use]
 extern crate structopt;
 use structopt::StructOpt;
-use std::ops::RangeInclusive;
-use std::path::PathBuf;
 
 extern crate combine;
 
 extern crate padfoot;
 
-use parsers::*;
+use options::*;
 
 fn main() {
     let opt = Opt::from_args();
@@ -19,47 +17,58 @@ fn main() {
     println!("{:?}", opt)
 }
 
-/// # Options
-#[derive(Debug, StructOpt)]
-struct Opt {
-    /// Command
-    #[structopt(subcommand)]
-    cmd: OptCmd,
-}
+/// StructOpt option types corresponding to the CLI interface
+mod options {
+    use std::{
+        ops::RangeInclusive,
+        path::PathBuf,
+    };
 
-#[derive(Debug, StructOpt)]
-enum OptCmd {
-    #[structopt(name = "cat")]
-    Cat {
-        #[structopt(flatten)]
-        inputs: Inputs,
+    use parsers::*;
+
+    /// # Options
+    #[derive(Debug, StructOpt)]
+    pub struct Opt {
+        /// Command
         #[structopt(subcommand)]
-        output: Option<OutputCmd>,
+        cmd: OptCmd,
+    }
+
+    #[derive(Debug, StructOpt)]
+    enum OptCmd {
+        #[structopt(name = "cat")]
+        Cat {
+            #[structopt(flatten)]
+            inputs: Inputs,
+            #[structopt(subcommand)]
+            output: Option<OutputCmd>,
+        }
+    }
+
+    #[derive(Debug, StructOpt)]
+    struct Inputs {
+        /// Input description
+        #[structopt(parse(try_from_str = "parse_input_element"))]
+        inputs: Vec<InputElement>,
+    }
+
+    #[derive(Debug, StructOpt)]
+    enum OutputCmd {
+        #[structopt(name = "output")]
+        Output {
+            #[structopt(parse(from_os_str))]
+            outfile: PathBuf,
+        },
+    }
+
+    #[derive(Debug)]
+    pub enum InputElement {
+        File(PathBuf),
+        PageRange(RangeInclusive<usize>),
     }
 }
 
-#[derive(Debug, StructOpt)]
-struct Inputs {
-    /// Input description
-    #[structopt(parse(try_from_str = "parse_input_element"))]
-    inputs: Vec<InputElement>,
-}
-
-#[derive(Debug, StructOpt)]
-enum OutputCmd {
-    #[structopt(name = "output")]
-    Output {
-        #[structopt(parse(from_os_str))]
-        outfile: PathBuf,
-    },
-}
-
-#[derive(Debug)]
-pub enum InputElement {
-    File(PathBuf),
-    PageRange(RangeInclusive<usize>),
-}
-
+/// Option parsing
 mod parsers {
     use combine::{
         *,
@@ -70,7 +79,7 @@ mod parsers {
 
     use padfoot::errors::Error;
 
-    use InputElement;
+    use options::*;
 
     /// Create a parser. This simply handles the messy, messy types.
     macro_rules! make_parser {
