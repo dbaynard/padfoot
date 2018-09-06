@@ -186,8 +186,16 @@ mod parsers {
     });
 
     make_parser!(inclusive_range, (usize, usize), {
-        let inclusive_range = number().skip(char('-')).and(number());
-        inclusive_range.message("Couldn’t parse inclusive range")
+        choice!(
+            number()
+                .and( optional(char('-').with(number())) )
+                .map(|x| match x {
+                    (f, Some(t)) => (f, t),
+                    (f, None) => (f, f),
+                }),
+            char('-').with(number())
+                .map(|x| (1, x))
+        ).message("Couldn’t parse inclusive range")
     });
 
     make_parser!(number, usize, {
