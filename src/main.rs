@@ -1,5 +1,9 @@
 #![recursion_limit = "1024"]
 
+#[cfg(test)]
+#[macro_use]
+extern crate quickcheck;
+
 /// Argument parsing uses `structopt`
 #[macro_use]
 extern crate structopt;
@@ -129,7 +133,7 @@ mod options {
         },
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, PartialEq)]
     pub enum InputElement {
         File(PathBuf),
         PageRange(RangeInclusive<usize>),
@@ -189,5 +193,55 @@ mod parsers {
     make_parser!(number, usize, {
         from_str(many1::<String, _>(digit())).message("Couldn’t parse number from digits")
     });
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        use quickcheck::TestResult;
+
+        use std::fmt::Debug;
+
+        fn test_parser<'a, A>(mut parser: impl Parser<Input = &'a str, Output = A>, input: &'a str, value: A)
+            where A: Debug + PartialEq
+        {
+            assert_eq!(parser.parse(input), Ok((value, "")));
+        }
+
+        quickcheck!{
+            fn prop_parser_number(n: usize) -> TestResult {
+                let s = format!("{}", &n);
+
+                let res = TestResult::from_bool(number().parse(&s[..]) == Ok((n, "")));
+
+                res
+            }
+
+            fn prop_parser_inclusive_range(n: (usize, usize)) -> TestResult {
+                let s = format!("{}-{}", n.0, n.1);
+
+                println!("{:?}", &n);
+
+                let res = TestResult::from_bool(inclusive_range().parse(&s[..]) == Ok((n, "")));
+
+                res
+            }
+        }
+
+        #[test]
+        fn test_parser_input_element() {
+            test_parser(input_element(), "file.pdf", InputElement::File("file.pdf".into()));
+            test_parser(input_element(), "file", InputElement::File("file".into()));
+            test_parser(input_element(), "3-4", InputElement::PageRange(3..=4));
+            test_parser(input_element(), "3-3", InputElement::PageRange(3..=3));
+            test_parser(input_element(), "4-3", InputElement::PageRange(4..=3));
+            test_parser(input_element(), "3", InputElement::PageRange(3..=3));
+            test_parser(input_element(), "3", InputElement::PageRange(3..=3));
+            // TODO
+            // test_parser(input_element(), "3-", InputElement::PageRange(3..=));
+            test_parser(input_element(), "-4", InputElement::PageRange(1..=4));
+        }
+
+    }
 
 }
