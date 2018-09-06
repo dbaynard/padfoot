@@ -188,13 +188,12 @@ mod parsers {
     make_parser!(inclusive_range, (usize, usize), {
         choice!(
             number()
-                .and( optional(char('-').with(number())) )
+                .and(optional(char('-').with(number())))
                 .map(|x| match x {
                     (f, Some(t)) => (f, t),
                     (f, None) => (f, f),
                 }),
-            char('-').with(number())
-                .map(|x| (1, x))
+            char('-').with(number()).map(|x| (1, x))
         ).message("Couldn’t parse inclusive range")
     });
 
@@ -210,8 +209,12 @@ mod parsers {
 
         use std::fmt::Debug;
 
-        fn test_parser<'a, A>(mut parser: impl Parser<Input = &'a str, Output = A>, input: &'a str, value: A)
-            where A: Debug + PartialEq
+        fn test_parser<'a, A>(
+            mut parser: impl Parser<Input = &'a str, Output = A>,
+            input: &'a str,
+            value: A,
+        ) where
+            A: Debug + PartialEq,
         {
             assert_eq!(parser.parse(input), Ok((value, "")));
         }
@@ -238,7 +241,11 @@ mod parsers {
 
         #[test]
         fn test_parser_input_element() {
-            test_parser(input_element(), "file.pdf", InputElement::File("file.pdf".into()));
+            test_parser(
+                input_element(),
+                "file.pdf",
+                InputElement::File("file.pdf".into()),
+            );
             test_parser(input_element(), "file", InputElement::File("file".into()));
             test_parser(input_element(), "3-4", InputElement::PageRange(3..=4));
             test_parser(input_element(), "3-3", InputElement::PageRange(3..=3));
