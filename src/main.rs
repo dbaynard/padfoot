@@ -1,5 +1,9 @@
 #![recursion_limit = "1024"]
 
+#[cfg(test)]
+#[macro_use]
+extern crate quickcheck;
+
 /// Argument parsing uses `structopt`
 #[macro_use]
 extern crate structopt;
@@ -8,10 +12,7 @@ use structopt::StructOpt;
 extern crate combine;
 
 extern crate padfoot;
-use padfoot::{
-    *,
-    errors::*,
-};
+use padfoot::{errors::*, *};
 
 use options::*;
 
@@ -31,10 +32,11 @@ fn main() -> Result<()> {
 /// The list of valid options settings according to the structopt library does not match the valid
 /// commands.
 fn process_options(opt: &mut Opt) -> Result<Command> {
-
     match opt.cmd {
-        OptCmd::Cat{ref mut inputs, ref output} =>
-            normalize_inputs(inputs, output, Command::Sel)
+        OptCmd::Cat {
+            ref mut inputs,
+            ref output,
+        } => normalize_inputs(inputs, output, Command::Sel),
     }
 }
 
@@ -44,8 +46,7 @@ fn normalize_inputs(
     inp: &mut Inputs,
     output: &Option<OutputCmd>,
     f: impl Fn(InputSel) -> Command,
-) -> Result<Command>
-{
+) -> Result<Command> {
     let inputs = &mut inp.inputs;
 
     let outfile = output.as_ref()
@@ -63,7 +64,7 @@ fn normalize_inputs(
     let inputs = group_inputs(&inputs)?;
     let outfile = PDFName::new(&outfile);
 
-    Ok(f(Sel{inputs, outfile}))
+    Ok(f(Sel { inputs, outfile }))
 }
 
 /// The input list contains a mix of filenames and page ranges.
@@ -72,36 +73,28 @@ fn normalize_inputs(
 /// Each filename may be followed by a (possibly empty) list of page ranges.
 /// These ranges are associated with the most recent preceding filename.
 fn group_inputs(is: &[InputElement]) -> Result<Vec<PDFPages<PDFName>>> {
-
     let input_algebra = |mut rz: Result<Vec<_>>, i: &InputElement| match i {
-
         InputElement::File(filepath) => {
-            let _ = rz.as_mut().map(|z| z.push(
-                PDFPages::new(
-                    PDFName::new(&filepath)
-                )
-            ));
+            let _ = rz
+                .as_mut()
+                .map(|z| z.push(PDFPages::new(PDFName::new(&filepath))));
             rz
-        },
+        }
 
         InputElement::PageRange(range) => {
-            let _ = rz.as_mut().map(|z| z.last_mut()
-                .map(|l| l.push_range(&range))
-            );
+            let _ = rz
+                .as_mut()
+                .map(|z| z.last_mut().map(|l| l.push_range(&range)));
             rz
-        },
-
+        }
     };
 
-    is.iter().fold( Ok(vec!()), input_algebra)
+    is.iter().fold(Ok(vec![]), input_algebra)
 }
 
 /// StructOpt option types corresponding to the CLI interface
 mod options {
-    use std::{
-        ops::RangeInclusive,
-        path::PathBuf,
-    };
+    use std::{ops::RangeInclusive, path::PathBuf};
 
     use parsers::*;
 
@@ -121,7 +114,7 @@ mod options {
             inputs: Inputs,
             #[structopt(subcommand)]
             output: Option<OutputCmd>,
-        }
+        },
     }
 
     #[derive(Debug, StructOpt)]
@@ -140,7 +133,7 @@ mod options {
         },
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, PartialEq)]
     pub enum InputElement {
         File(PathBuf),
         PageRange(RangeInclusive<usize>),
@@ -149,10 +142,7 @@ mod options {
 
 /// Option parsing
 mod parsers {
-    use combine::{
-        *,
-        char::*,
-    };
+    use combine::{char::*, *};
 
     use std::path::PathBuf;
 
@@ -176,39 +166,97 @@ mod parsers {
 
     /// Parse a single input element
     pub fn parse_input_element(i: &str) -> Result<InputElement, Error> {
-        let (parsed, _) = input_element().parse(i)
+        let (parsed, _) = input_element()
+            .parse(i)
             .or(Err("Couldn’t parse input element"))?;
         Ok(parsed)
     }
 
-    make_parser!(input_element, InputElement,
-    {
+    make_parser!(input_element, InputElement, {
         choice!(
-            try(inclusive_range()).map(|(f,t)| InputElement::PageRange(f ..= t)),
+            try(inclusive_range()).map(|(f, t)| InputElement::PageRange(f..=t)),
             path_buf().map(InputElement::File)
         ).message("Couldn’t parse input element")
     });
 
-    make_parser!(path_buf, PathBuf,
-    {
+    make_parser!(path_buf, PathBuf, {
         many1(any())
             .map(|x: String| PathBuf::from(&x))
             .message("Couldn’t parse potential path")
     });
 
-    make_parser!(inclusive_range, (usize, usize),
-    {
-        let inclusive_range = number()
-            .skip(char('-'))
-            .and(number());
-        inclusive_range
-            .message("Couldn’t parse inclusive range")
+    make_parser!(inclusive_range, (usize, usize), {
+        choice!(
+            number()
+                .and(optional(char('-').with(number())))
+                .map(|x| match x {
+                    (f, Some(t)) => (f, t),
+                    (f, None) => (f, f),
+                }),
+            char('-').with(number()).map(|x| (1, x))
+        ).message("Couldn’t parse inclusive range")
     });
 
-    make_parser!(number, usize,
-    {
-        from_str(many1::<String, _>(digit()))
-            .message("Couldn’t parse number from digits")
+    make_parser!(number, usize, {
+        from_str(many1::<String, _>(digit())).message("Couldn’t parse number from digits")
     });
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        use quickcheck::TestResult;
+
+        use std::fmt::Debug;
+
+        fn test_parser<'a, A>(
+            mut parser: impl Parser<Input = &'a str, Output = A>,
+            input: &'a str,
+            value: A,
+        ) where
+            A: Debug + PartialEq,
+        {
+            assert_eq!(parser.parse(input), Ok((value, "")));
+        }
+
+        quickcheck!{
+            fn prop_parser_number(n: usize) -> TestResult {
+                let s = format!("{}", &n);
+
+                let res = TestResult::from_bool(number().parse(&s[..]) == Ok((n, "")));
+
+                res
+            }
+
+            fn prop_parser_inclusive_range(n: (usize, usize)) -> TestResult {
+                let s = format!("{}-{}", n.0, n.1);
+
+                println!("{:?}", &n);
+
+                let res = TestResult::from_bool(inclusive_range().parse(&s[..]) == Ok((n, "")));
+
+                res
+            }
+        }
+
+        #[test]
+        fn test_parser_input_element() {
+            test_parser(
+                input_element(),
+                "file.pdf",
+                InputElement::File("file.pdf".into()),
+            );
+            test_parser(input_element(), "file", InputElement::File("file".into()));
+            test_parser(input_element(), "3-4", InputElement::PageRange(3..=4));
+            test_parser(input_element(), "3-3", InputElement::PageRange(3..=3));
+            test_parser(input_element(), "4-3", InputElement::PageRange(4..=3));
+            test_parser(input_element(), "3", InputElement::PageRange(3..=3));
+            test_parser(input_element(), "3", InputElement::PageRange(3..=3));
+            // TODO
+            // test_parser(input_element(), "3-", InputElement::PageRange(3..=));
+            test_parser(input_element(), "-4", InputElement::PageRange(1..=4));
+        }
+
+    }
 
 }
