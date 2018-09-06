@@ -1,11 +1,8 @@
 //! Select pages from pdf(s) and concatenate into a single output pdf
 
 use std::{
-    path::{
-        Path,
-        PathBuf,
-    },
     ops::RangeInclusive,
+    path::{Path, PathBuf},
 };
 
 /// The arguments supplied to the `sel` command.
@@ -19,7 +16,7 @@ pub struct Sel<A> {
 }
 
 #[derive(Debug)]
-pub struct PDFName (PathBuf);
+pub struct PDFName(PathBuf);
 
 impl PDFName {
     pub fn new(pb: &Path) -> Self {
@@ -40,12 +37,11 @@ pub struct PDFPages<A> {
 }
 
 impl<A> PDFPages<A> {
-
     /// Create new `PDFPages` value corresponding to the full page range.
     pub fn new(file: A) -> PDFPages<A> {
         PDFPages {
             file,
-            page_ranges: vec!(),
+            page_ranges: vec![],
         }
     }
 
