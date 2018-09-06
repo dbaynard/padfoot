@@ -1,7 +1,5 @@
 #![recursion_limit = "1024"]
 
-use std::path::Path;
-
 /// Argument parsing uses `structopt`
 #[macro_use]
 extern crate structopt;
@@ -62,24 +60,10 @@ fn normalize_inputs(
             })
         )?;
 
-    let sel = apply_inputs(
-        &inputs,
-        &outfile,
-        |inputs, outfile| Sel{inputs, outfile}
-    )?;
+    let inputs = group_inputs(&inputs)?;
+    let outfile = PDFName::new(&outfile);
 
-    Ok(f(sel))
-}
-
-fn apply_inputs<A>(
-    inputs: &[InputElement],
-    outfile: &Path,
-    f: impl Fn(Vec<PDFPages<PDFName>>, PDFName) -> A
-) -> Result<A>
-{
-    let inputs = group_inputs(inputs)?;
-    let outfile = PDFName::new(outfile);
-    Ok(f(inputs, outfile))
+    Ok(f(Sel{inputs, outfile}))
 }
 
 /// The input list contains a mix of filenames and page ranges.
