@@ -5,7 +5,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use itertools::{Itertools, MinMaxResult};
+
 use lopdf::*;
+
+use errors::*;
 
 /// The arguments supplied to the `sel` command.
 pub type InputSel = Sel<PDFName>;
@@ -52,6 +56,7 @@ impl<A> PDFPages<A> {
     }
 }
 
+/// Load specified documents
 pub fn load_docs(inps: InputSel) -> Sel<Document> {
     type PIn = PDFPages<PDFName>;
     type POut = PDFPages<Document>;
@@ -68,4 +73,16 @@ pub fn load_docs(inps: InputSel) -> Sel<Document> {
     let inputs: Vec<POut> = inputs.into_iter().filter_map(load_doc).collect();
 
     Sel { inputs, outfile }
+}
+
+/// Identify a document’s page range
+pub fn page_range(doc: &Document) -> Result<RangeInclusive<u32>> {
+    let pages = doc.get_pages();
+
+    match pages.keys().minmax() {
+        // TODO Should assert no error here
+        MinMaxResult::NoElements => Err("No pages in pdf".into()),
+        MinMaxResult::OneElement(&el) => Ok(el..=el),
+        MinMaxResult::MinMax(&min, &max) => Ok(min..=max),
+    }
 }
