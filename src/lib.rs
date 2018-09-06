@@ -4,8 +4,9 @@
 #[macro_use]
 extern crate error_chain;
 
+extern crate lopdf;
+
 pub mod errors;
-use errors::*;
 
 mod sel;
 pub use sel::*;

@@ -5,6 +5,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use lopdf::*;
+
 /// The arguments supplied to the `sel` command.
 pub type InputSel = Sel<PDFName>;
 
@@ -48,4 +50,22 @@ impl<A> PDFPages<A> {
     pub fn push_range(&mut self, range: &RangeInclusive<usize>) {
         self.page_ranges.push(range.clone());
     }
+}
+
+pub fn load_docs(inps: InputSel) -> Sel<Document> {
+    type PIn = PDFPages<PDFName>;
+    type POut = PDFPages<Document>;
+
+    fn load_doc(PDFPages { file, page_ranges }: PIn) -> Option<POut> {
+        Document::load(&file.0)
+            .map(|file| PDFPages { file, page_ranges })
+            .ok()
+    }
+
+    let inputs = inps.inputs;
+    let outfile = inps.outfile;
+
+    let inputs: Vec<POut> = inputs.into_iter().filter_map(load_doc).collect();
+
+    Sel { inputs, outfile }
 }
