@@ -11,7 +11,7 @@ use std::{
 /// The arguments supplied to the `sel` command.
 pub type InputSel = Sel<PDFName>;
 
-/// Data correspon to the `sel` command.
+/// Data corresponding to the `sel` command.
 #[derive(Debug)]
 pub struct Sel<A> {
     pub inputs: Vec<PDFPages<A>>,

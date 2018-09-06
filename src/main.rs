@@ -1,5 +1,7 @@
 #![recursion_limit = "1024"]
 
+use std::path::Path;
+
 /// Argument parsing uses `structopt`
 #[macro_use]
 extern crate structopt;
@@ -16,6 +18,7 @@ use padfoot::{
 use options::*;
 
 fn main() -> Result<()> {
+    // Why mutable? Well, it means they can be normalized later.
     let mut opt = Opt::from_args();
 
     let cmd = process_options(&mut opt)?;
@@ -25,40 +28,73 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+/// The options supplied to the program must be converted to the internal DSL it uses.
+///
+/// The list of valid options settings according to the structopt library does not match the valid
+/// commands.
 fn process_options(opt: &mut Opt) -> Result<Command> {
 
     match opt.cmd {
-
-        OptCmd::Cat{ref mut inputs, ref output} => match output {
-
-            Some(OutputCmd::Output{outfile}) => {
-                let inputs = group_inputs(&inputs.inputs)?;
-                let outfile = PDFName::new(&outfile);
-                Ok(Command::Sel(Sel{inputs, outfile}))
-            },
-
-            None => {
-                if let Some(InputElement::File(outf)) = inputs.inputs.pop() {
-                    let inputs = group_inputs(&inputs.inputs)?;
-                    let outfile = PDFName::new(&outf);
-                    Ok(Command::Sel(Sel{inputs, outfile}))
-                } else {
-                    Err("Could not identify the output file.".into())
-                }
-            },
-
-        }
+        OptCmd::Cat{ref mut inputs, ref output} =>
+            normalize_inputs(inputs, output, Command::Sel)
     }
 }
 
+/// It is possible to supply a list of inputs, with the output last (rather than delimited with the
+/// `output` symbol, like pdftk). This ensures that there is exactly one output file.
+fn normalize_inputs(
+    inp: &mut Inputs,
+    output: &Option<OutputCmd>,
+    f: impl Fn(InputSel) -> Command,
+) -> Result<Command>
+{
+    let inputs = &mut inp.inputs;
+
+    let outfile = output.as_ref()
+        .map(|OutputCmd::Output{outfile}| outfile.clone())
+        .ok_or_else::<Error,_>(|| "No explicit output supplied".into())
+        // If no explicit output, pop the last input value
+        .or_else(|_| inputs.pop()
+            .ok_or_else::<Error,_>(|| "No input supplied.".into())
+            .and_then(|x| match x {
+                InputElement::File(outfile) => Ok(outfile),
+                _ => Err("The arguments must finish with an output file name.".into()),
+            })
+        )?;
+
+    let sel = apply_inputs(
+        &inputs,
+        &outfile,
+        |inputs, outfile| Sel{inputs, outfile}
+    )?;
+
+    Ok(f(sel))
+}
+
+fn apply_inputs<A>(
+    inputs: &[InputElement],
+    outfile: &Path,
+    f: impl Fn(Vec<PDFPages<PDFName>>, PDFName) -> A
+) -> Result<A>
+{
+    let inputs = group_inputs(inputs)?;
+    let outfile = PDFName::new(outfile);
+    Ok(f(inputs, outfile))
+}
+
+/// The input list contains a mix of filenames and page ranges.
+///
+/// The list must begin with a filename.
+/// Each filename may be followed by a (possibly empty) list of page ranges.
+/// These ranges are associated with the most recent preceding filename.
 fn group_inputs(is: &[InputElement]) -> Result<Vec<PDFPages<PDFName>>> {
 
-    is.iter().fold( Ok(vec!()), |mut rz, i| match i {
+    let input_algebra = |mut rz: Result<Vec<_>>, i: &InputElement| match i {
 
         InputElement::File(filepath) => {
             let _ = rz.as_mut().map(|z| z.push(
                 PDFPages::new(
-                    PDFName::new(filepath)
+                    PDFName::new(&filepath)
                 )
             ));
             rz
@@ -66,12 +102,14 @@ fn group_inputs(is: &[InputElement]) -> Result<Vec<PDFPages<PDFName>>> {
 
         InputElement::PageRange(range) => {
             let _ = rz.as_mut().map(|z| z.last_mut()
-                .map(|l| l.push_range(range))
+                .map(|l| l.push_range(&range))
             );
             rz
         },
 
-    })
+    };
+
+    is.iter().fold( Ok(vec!()), input_algebra)
 }
 
 /// StructOpt option types corresponding to the CLI interface
