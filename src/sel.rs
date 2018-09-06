@@ -56,8 +56,19 @@ impl<A> PDFPages<A> {
     }
 }
 
+/// Run the input
+pub fn sel(input: InputSel) -> Result<()> {
+    let sels = load_docs(input);
+
+    //Ok(Document::new());
+
+    Ok::<_, Error>(())
+}
+
 /// Load specified documents
-pub fn load_docs(inps: InputSel) -> Sel<Document> {
+///
+/// TODO Don’t silence errors
+fn load_docs(inps: InputSel) -> Sel<Document> {
     type PIn = PDFPages<PDFName>;
     type POut = PDFPages<Document>;
 

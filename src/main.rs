@@ -24,6 +24,8 @@ fn main() -> Result<()> {
 
     println!("{:?}", cmd);
 
+    padfoot(cmd)?;
+
     Ok(())
 }
 

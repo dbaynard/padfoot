@@ -9,6 +9,7 @@ extern crate itertools;
 extern crate lopdf;
 
 pub mod errors;
+use errors::*;
 
 mod sel;
 pub use sel::*;
@@ -17,4 +18,10 @@ pub use sel::*;
 #[derive(Debug)]
 pub enum Command {
     Sel(InputSel),
+}
+
+pub fn padfoot(c: Command) -> Result<()> {
+    match c {
+        Command::Sel(i) => sel(i),
+    }
 }
