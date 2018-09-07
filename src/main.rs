@@ -24,6 +24,8 @@ fn main() -> Result<()> {
 
     println!("{:?}", cmd);
 
+    padfoot(cmd)?;
+
     Ok(())
 }
 
@@ -72,20 +74,28 @@ fn normalize_inputs(
 /// The list must begin with a filename.
 /// Each filename may be followed by a (possibly empty) list of page ranges.
 /// These ranges are associated with the most recent preceding filename.
+///
+/// TODO
+/// Check list is non empty (inc. after getting the output file name)
+/// Check list begins with filename
 fn group_inputs(is: &[InputElement]) -> Result<Vec<PDFPages<PDFName>>> {
-    let input_algebra = |mut rz: Result<Vec<_>>, i: &InputElement| match i {
-        InputElement::File(filepath) => {
-            let _ = rz
-                .as_mut()
-                .map(|z| z.push(PDFPages::new(PDFName::new(&filepath))));
-            rz
-        }
+    type Res = Result<Vec<PDFPages<PDFName>>>;
 
-        InputElement::PageRange(range) => {
-            let _ = rz
-                .as_mut()
-                .map(|z| z.last_mut().map(|l| l.push_range(&range)));
-            rz
+    fn input_algebra(mut rz: Res, i: &InputElement) -> Res {
+        match i {
+            InputElement::File(filepath) => {
+                let _ = rz
+                    .as_mut()
+                    .map(|z| z.push(PDFPages::new(PDFName::new(&filepath))));
+                rz
+            }
+
+            InputElement::PageRange(range) => {
+                let _ = rz
+                    .as_mut()
+                    .map(|z| z.last_mut().map(|l| l.push_range(&range)));
+                rz
+            }
         }
     };
 
@@ -188,13 +198,12 @@ mod parsers {
     make_parser!(inclusive_range, (usize, usize), {
         choice!(
             number()
-                .and( optional(char('-').with(number())) )
+                .and(optional(char('-').with(number())))
                 .map(|x| match x {
                     (f, Some(t)) => (f, t),
                     (f, None) => (f, f),
                 }),
-            char('-').with(number())
-                .map(|x| (1, x))
+            char('-').with(number()).map(|x| (1, x))
         ).message("Couldn’t parse inclusive range")
     });
 
@@ -210,8 +219,12 @@ mod parsers {
 
         use std::fmt::Debug;
 
-        fn test_parser<'a, A>(mut parser: impl Parser<Input = &'a str, Output = A>, input: &'a str, value: A)
-            where A: Debug + PartialEq
+        fn test_parser<'a, A>(
+            mut parser: impl Parser<Input = &'a str, Output = A>,
+            input: &'a str,
+            value: A,
+        ) where
+            A: Debug + PartialEq,
         {
             assert_eq!(parser.parse(input), Ok((value, "")));
         }
@@ -238,7 +251,11 @@ mod parsers {
 
         #[test]
         fn test_parser_input_element() {
-            test_parser(input_element(), "file.pdf", InputElement::File("file.pdf".into()));
+            test_parser(
+                input_element(),
+                "file.pdf",
+                InputElement::File("file.pdf".into()),
+            );
             test_parser(input_element(), "file", InputElement::File("file".into()));
             test_parser(input_element(), "3-4", InputElement::PageRange(3..=4));
             test_parser(input_element(), "3-3", InputElement::PageRange(3..=3));
