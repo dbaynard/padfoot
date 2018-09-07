@@ -24,6 +24,8 @@ fn main() -> Result<()> {
 
     println!("{:?}", cmd);
 
+    padfoot(cmd)?;
+
     Ok(())
 }
 
@@ -72,20 +74,28 @@ fn normalize_inputs(
 /// The list must begin with a filename.
 /// Each filename may be followed by a (possibly empty) list of page ranges.
 /// These ranges are associated with the most recent preceding filename.
+///
+/// TODO
+/// Check list is non empty (inc. after getting the output file name)
+/// Check list begins with filename
 fn group_inputs(is: &[InputElement]) -> Result<Vec<PDFPages<PDFName>>> {
-    let input_algebra = |mut rz: Result<Vec<_>>, i: &InputElement| match i {
-        InputElement::File(filepath) => {
-            let _ = rz
-                .as_mut()
-                .map(|z| z.push(PDFPages::new(PDFName::new(&filepath))));
-            rz
-        }
+    type Res = Result<Vec<PDFPages<PDFName>>>;
 
-        InputElement::PageRange(range) => {
-            let _ = rz
-                .as_mut()
-                .map(|z| z.last_mut().map(|l| l.push_range(&range)));
-            rz
+    fn input_algebra(mut rz: Res, i: &InputElement) -> Res {
+        match i {
+            InputElement::File(filepath) => {
+                let _ = rz
+                    .as_mut()
+                    .map(|z| z.push(PDFPages::new(PDFName::new(&filepath))));
+                rz
+            }
+
+            InputElement::PageRange(range) => {
+                let _ = rz
+                    .as_mut()
+                    .map(|z| z.last_mut().map(|l| l.push_range(&range)));
+                rz
+            }
         }
     };
 

@@ -5,6 +5,12 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use itertools::{Itertools, MinMaxResult};
+
+use lopdf::*;
+
+use errors::*;
+
 /// The arguments supplied to the `sel` command.
 pub type InputSel = Sel<PDFName>;
 
@@ -47,5 +53,47 @@ impl<A> PDFPages<A> {
 
     pub fn push_range(&mut self, range: &RangeInclusive<usize>) {
         self.page_ranges.push(range.clone());
+    }
+}
+
+/// Run the input
+pub fn sel(input: InputSel) -> Result<()> {
+    let sels = load_docs(input);
+
+    //Ok(Document::new());
+
+    Ok::<_, Error>(())
+}
+
+/// Load specified documents
+///
+/// TODO Don’t silence errors
+fn load_docs(inps: InputSel) -> Sel<Document> {
+    type PIn = PDFPages<PDFName>;
+    type POut = PDFPages<Document>;
+
+    fn load_doc(PDFPages { file, page_ranges }: PIn) -> Option<POut> {
+        Document::load(&file.0)
+            .map(|file| PDFPages { file, page_ranges })
+            .ok()
+    }
+
+    let inputs = inps.inputs;
+    let outfile = inps.outfile;
+
+    let inputs: Vec<POut> = inputs.into_iter().filter_map(load_doc).collect();
+
+    Sel { inputs, outfile }
+}
+
+/// Identify a document’s page range
+pub fn page_range(doc: &Document) -> Result<RangeInclusive<u32>> {
+    let pages = doc.get_pages();
+
+    match pages.keys().minmax() {
+        // TODO Should assert no error here
+        MinMaxResult::NoElements => Err("No pages in pdf".into()),
+        MinMaxResult::OneElement(&el) => Ok(el..=el),
+        MinMaxResult::MinMax(&min, &max) => Ok(min..=max),
     }
 }
