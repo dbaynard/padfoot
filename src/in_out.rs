@@ -44,6 +44,26 @@ impl<A> PDFPages<A> {
     pub fn push_range(&mut self, range: &RangeInclusive<usize>) {
         self.page_ranges.push(range.clone());
     }
+
+    pub fn map<B>(self, f: impl FnOnce(A) -> B) -> PDFPages<B> {
+        let page_ranges = self.page_ranges;
+        let file = f(self.file);
+
+        PDFPages { file, page_ranges }
+    }
+
+    pub fn traverse<B>(self, f: impl FnOnce(A) -> Result<B>) -> Result<PDFPages<B>> {
+        let page_ranges = self.page_ranges;
+        let file = f(self.file)?;
+
+        Ok(PDFPages { file, page_ranges })
+    }
+}
+
+impl PDFPages<PDFName> {
+    fn load_doc(self) -> Option<PDFPages<Document>> {
+        self.traverse(|x| PDFName::load_doc(&x)).ok()
+    }
 }
 
 /// Run the input
@@ -55,23 +75,35 @@ pub fn sel(input: InputInOut) -> Result<()> {
     Ok::<_, Error>(())
 }
 
+/// Display metadata
+pub fn info(input: &[PDFName]) -> Result<()> {
+    Err("Not implemented yet".into())
+}
+
+#[derive(Debug)]
+enum DocsForLoad<'a> {
+    InOnly(&'a [PDFName]),
+    InOut(&'a InputInOut),
+}
+
+/*
+ *impl DocsForLoad<'a> {
+ *    fn load_docs(self) ->  {
+ *        let inputs = match
+ *    }
+ *}
+ */
+
 /// Load specified documents
 ///
 /// TODO Don’t silence errors
 fn load_docs(inps: InputInOut) -> InOut<Document> {
-    type PIn = PDFPages<PDFName>;
     type POut = PDFPages<Document>;
-
-    fn load_doc(PDFPages { file, page_ranges }: PIn) -> Option<POut> {
-        file.over(|x| Document::load(x))
-            .map(|file| PDFPages { file, page_ranges })
-            .ok()
-    }
 
     let inputs = inps.inputs;
     let outfile = inps.outfile;
 
-    let inputs: Vec<POut> = inputs.into_iter().filter_map(load_doc).collect();
+    let inputs: Vec<POut> = inputs.into_iter().filter_map(PDFPages::load_doc).collect();
 
     InOut { inputs, outfile }
 }
