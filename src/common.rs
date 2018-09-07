@@ -8,6 +8,8 @@ use std::{
 #[derive(Debug)]
 pub struct PDFName(PathBuf);
 
+/// TODO
+/// Ensure this corresponds to valid file
 impl PDFName {
     pub fn new(pb: &Path) -> Self {
         PDFName(pb.to_path_buf())

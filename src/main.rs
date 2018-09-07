@@ -18,9 +18,9 @@ use options::*;
 
 fn main() -> Result<()> {
     // Why mutable? Well, it means they can be normalized later.
-    let mut opt = Opt::from_args();
+    let opt = Opt::from_args();
 
-    let cmd = process_options(&mut opt)?;
+    let cmd = process_options(opt)?;
 
     println!("{:?}", cmd);
 
@@ -33,12 +33,15 @@ fn main() -> Result<()> {
 ///
 /// The list of valid options settings according to the structopt library does not match the valid
 /// commands.
-fn process_options(opt: &mut Opt) -> Result<Command> {
+fn process_options(opt: Opt) -> Result<Command> {
     match opt.cmd {
-        OptCmd::Cat {
-            ref mut inputs,
-            ref output,
-        } => normalize_inputs(inputs, output, Command::Sel),
+        OptCmd::Cat { mut inputs, output } => normalize_inputs(&mut inputs, &output, Command::Sel),
+
+        OptCmd::Zip { mut inputs, output } => normalize_inputs(&mut inputs, &output, Command::Zip),
+
+        OptCmd::Burst { inputs } => Ok(Command::Burst(inputs)),
+
+        OptCmd::Info { inputs } => Ok(Command::Info(inputs)),
     }
 }
 
@@ -106,6 +109,8 @@ fn group_inputs(is: &[InputElement]) -> Result<Vec<PDFPages<PDFName>>> {
 mod options {
     use std::{ops::RangeInclusive, path::PathBuf};
 
+    use padfoot::PDFName;
+
     use parsers::*;
 
     /// # Options
@@ -124,6 +129,26 @@ mod options {
             inputs: Inputs,
             #[structopt(subcommand)]
             output: Option<OutputCmd>,
+        },
+
+        #[structopt(name = "zip")]
+        Zip {
+            #[structopt(flatten)]
+            inputs: Inputs,
+            #[structopt(subcommand)]
+            output: Option<OutputCmd>,
+        },
+
+        #[structopt(name = "burst")]
+        Burst {
+            #[structopt(parse(from_os_str))]
+            inputs: Vec<PDFName>,
+        },
+
+        #[structopt(name = "info")]
+        Info {
+            #[structopt(parse(from_os_str))]
+            inputs: Vec<PDFName>,
         },
     }
 
