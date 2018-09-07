@@ -9,12 +9,13 @@ use lopdf::*;
 use common::*;
 use errors::*;
 
-/// The arguments supplied to the `sel` command.
-pub type InputSel = Sel<PDFName>;
+/// The arguments supplied to the `sel` and `zip` commands.
+pub type InputInOut = InOut<PDFName>;
 
-/// Data corresponding to the `sel` command.
+/// Input files (with optional ranges) and output file corresponding to the `sel` and `zip`
+/// commands.
 #[derive(Debug)]
-pub struct Sel<A> {
+pub struct InOut<A> {
     pub inputs: Vec<PDFPages<A>>,
     pub outfile: PDFName,
 }
@@ -46,7 +47,7 @@ impl<A> PDFPages<A> {
 }
 
 /// Run the input
-pub fn sel(input: InputSel) -> Result<()> {
+pub fn sel(input: InputInOut) -> Result<()> {
     let sels = load_docs(input);
 
     //Ok(Document::new());
@@ -57,7 +58,7 @@ pub fn sel(input: InputSel) -> Result<()> {
 /// Load specified documents
 ///
 /// TODO Don’t silence errors
-fn load_docs(inps: InputSel) -> Sel<Document> {
+fn load_docs(inps: InputInOut) -> InOut<Document> {
     type PIn = PDFPages<PDFName>;
     type POut = PDFPages<Document>;
 
@@ -72,7 +73,7 @@ fn load_docs(inps: InputSel) -> Sel<Document> {
 
     let inputs: Vec<POut> = inputs.into_iter().filter_map(load_doc).collect();
 
-    Sel { inputs, outfile }
+    InOut { inputs, outfile }
 }
 
 /// Identify a document’s page range

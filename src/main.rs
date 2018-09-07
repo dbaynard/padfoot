@@ -50,7 +50,7 @@ fn process_options(opt: Opt) -> Result<Command> {
 fn normalize_inputs(
     inp: &mut Inputs,
     output: &Option<OutputCmd>,
-    f: impl Fn(InputSel) -> Command,
+    f: impl Fn(InputInOut) -> Command,
 ) -> Result<Command> {
     let inputs = &mut inp.inputs;
 
@@ -69,7 +69,7 @@ fn normalize_inputs(
     let inputs = group_inputs(&inputs)?;
     let outfile = PDFName::new(&outfile);
 
-    Ok(f(Sel { inputs, outfile }))
+    Ok(f(InOut { inputs, outfile }))
 }
 
 /// The input list contains a mix of filenames and page ranges.

@@ -14,14 +14,14 @@ use errors::*;
 mod common;
 pub use common::*;
 
-mod sel;
-pub use sel::*;
+mod in_out;
+pub use in_out::*;
 
 /// The commands supplied to the library
 #[derive(Debug)]
 pub enum Command {
-    Sel(InputSel),
-    Zip(InputSel),
+    Sel(InputInOut),
+    Zip(InputInOut),
     Burst(Vec<PDFName>),
     Info(Vec<PDFName>),
 }
