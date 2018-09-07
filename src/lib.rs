@@ -31,6 +31,6 @@ pub fn padfoot(c: Command) -> Result<()> {
         Command::Sel(i) => sel(i),
         Command::Zip(_) => Err("Not implemented yet".into()),
         Command::Burst(_) => Err("Not implemented yet".into()),
-        Command::Info(_) => Err("Not implemented yet".into()),
+        Command::Info(i) => info(&i),
     }
 }

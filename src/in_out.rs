@@ -62,13 +62,13 @@ impl<A> PDFPages<A> {
 
 impl PDFPages<PDFName> {
     fn load_doc(self) -> Option<PDFPages<Document>> {
-        self.traverse(|x| PDFName::load_doc(&x)).ok()
+        self.traverse(|x| x.load_doc()).ok()
     }
 }
 
 /// Run the input
 pub fn sel(input: InputInOut) -> Result<()> {
-    let sels = load_docs(input);
+    //let sels = load_docs(input);
 
     //Ok(Document::new());
 
@@ -77,36 +77,27 @@ pub fn sel(input: InputInOut) -> Result<()> {
 
 /// Display metadata
 pub fn info(input: &[PDFName]) -> Result<()> {
-    Err("Not implemented yet".into())
-}
+    let docs = input.iter().filter_map(|x| x.load_doc().ok());
 
-#[derive(Debug)]
-enum DocsForLoad<'a> {
-    InOnly(&'a [PDFName]),
-    InOut(&'a InputInOut),
+    docs.for_each(|x| println!("{:#?}", x));
+
+    Ok(())
 }
 
 /*
- *impl DocsForLoad<'a> {
- *    fn load_docs(self) ->  {
- *        let inputs = match
+ *#[derive(Debug)]
+ *struct DocsForLoad<'a> (&'a [PDFName]);
+ *
+ *impl<'a> DocsForLoad<'a> {
+ *    pub fn new(ds: &'a [PDFName]) -> DocsForLoad<'a> {
+ *        DocsForLoad (ds)
+ *    }
+ *
+ *    fn load_all(self) -> impl Iterator<Item = Result<Document>> {
+ *        self.0.iter().map(|x| PDFName::load_doc(x))
  *    }
  *}
  */
-
-/// Load specified documents
-///
-/// TODO Don’t silence errors
-fn load_docs(inps: InputInOut) -> InOut<Document> {
-    type POut = PDFPages<Document>;
-
-    let inputs = inps.inputs;
-    let outfile = inps.outfile;
-
-    let inputs: Vec<POut> = inputs.into_iter().filter_map(PDFPages::load_doc).collect();
-
-    InOut { inputs, outfile }
-}
 
 /// Identify a document’s page range
 pub fn page_range(doc: &Document) -> Result<RangeInclusive<u32>> {
