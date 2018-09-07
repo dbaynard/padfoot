@@ -11,17 +11,26 @@ extern crate lopdf;
 pub mod errors;
 use errors::*;
 
-mod sel;
-pub use sel::*;
+mod common;
+pub use common::*;
+
+mod in_out;
+pub use in_out::*;
 
 /// The commands supplied to the library
 #[derive(Debug)]
 pub enum Command {
-    Sel(InputSel),
+    Sel(InputInOut),
+    Zip(InputInOut),
+    Burst(Vec<PDFName>),
+    Info(Vec<PDFName>),
 }
 
 pub fn padfoot(c: Command) -> Result<()> {
     match c {
         Command::Sel(i) => sel(i),
+        Command::Zip(_) => Err("Not implemented yet".into()),
+        Command::Burst(_) => Err("Not implemented yet".into()),
+        Command::Info(_) => Err("Not implemented yet".into()),
     }
 }
