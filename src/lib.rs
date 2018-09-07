@@ -11,6 +11,9 @@ extern crate lopdf;
 pub mod errors;
 use errors::*;
 
+mod common;
+pub use common::*;
+
 mod sel;
 pub use sel::*;
 

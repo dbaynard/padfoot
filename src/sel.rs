@@ -1,14 +1,12 @@
 //! Select pages from pdf(s) and concatenate into a single output pdf
 
-use std::{
-    ops::RangeInclusive,
-    path::{Path, PathBuf},
-};
+use std::ops::RangeInclusive;
 
 use itertools::{Itertools, MinMaxResult};
 
 use lopdf::*;
 
+use common::*;
 use errors::*;
 
 /// The arguments supplied to the `sel` command.
@@ -19,15 +17,6 @@ pub type InputSel = Sel<PDFName>;
 pub struct Sel<A> {
     pub inputs: Vec<PDFPages<A>>,
     pub outfile: PDFName,
-}
-
-#[derive(Debug)]
-pub struct PDFName(PathBuf);
-
-impl PDFName {
-    pub fn new(pb: &Path) -> Self {
-        PDFName(pb.to_path_buf())
-    }
 }
 
 #[derive(Debug)]
@@ -73,7 +62,7 @@ fn load_docs(inps: InputSel) -> Sel<Document> {
     type POut = PDFPages<Document>;
 
     fn load_doc(PDFPages { file, page_ranges }: PIn) -> Option<POut> {
-        Document::load(&file.0)
+        file.over(|x| Document::load(x))
             .map(|file| PDFPages { file, page_ranges })
             .ok()
     }
