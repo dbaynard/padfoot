@@ -3,6 +3,7 @@ use std::result;
 error_chain!{
     foreign_links {
         Xmltree(::xmltree::ParseError);
+        Utf8(::std::str::Utf8Error);
     }
 }
 
