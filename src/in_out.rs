@@ -1,9 +1,9 @@
 //! Select pages from pdf(s) and concatenate into a single output pdf
 
-use std::{ops::RangeInclusive, str};
+use std::{borrow::Cow, ops::RangeInclusive, str, iter};
 
 use itertools::{Itertools, MinMaxResult};
-use xmltree::{Element};
+use xmltree::Element;
 
 use lopdf::*;
 
@@ -80,19 +80,24 @@ pub fn sel(input: InputInOut) -> Result<()> {
 pub fn info(input: &[PDFName]) -> Result<()> {
     let docs = input.iter().filter_map(|x| x.load_doc().ok());
 
-    docs.for_each(|x| println!("{:#?}", get_metadata(&x)));
+    docs.for_each(|x| println!("{:#?}", get_trail_info(&x)));
 
     Ok(())
 }
 
-fn get_metadata(doc: &Document) -> Result<(&Dictionary, Element)> {
+fn get_trail_info(doc: &Document) -> Result<&Dictionary> {
     let trail = &doc.trailer;
+
     let info = trail
         .get("Info")
         .and_then(Object::as_reference)
         .error("Couldn’t identify pdf info")
         .and_then(|r| doc.get_dictionary(r).error("Couldn’t access pdf info"))?;
 
+    Ok(info)
+}
+
+fn get_metadata(doc: &Document) -> Result<Vec<(String, String)>> {
     let catalog = doc.catalog().error("Couldn’t access catalog")?;
 
     let metadata = catalog
@@ -106,13 +111,47 @@ fn get_metadata(doc: &Document) -> Result<(&Dictionary, Element)> {
         })
         .map(|s| &s.content)
         //.and_then(|s| str::from_utf8(&s[54..]).error("Couldn’t decode utf8"))?;
-        .and_then(|s| Element::parse(&s[54..]).chain_err(|| "Couldn’t read xml"))?;
+        .and_then(|s| Element::parse(&s[54..]).chain_err(|| "Couldn’t read xml"))
+        .map(|e| text_names(&e).into_iter().map(|(n,t)| (n.into_owned(), t.into_owned())).collect())?;
 
-    fn decode_stream(s: &Stream) -> Result<content::Content> {
-        s.decode_content().error("Couldn’t parse content stream")
+/*
+ *    fn decode_stream(s: &Stream) -> Result<content::Content> {
+ *        s.decode_content().error("Couldn’t parse content stream")
+ *    }
+ *
+ *    fn chain_leaves<A>(e: &Element) -> impl Iterator<Item = &Element> {
+ *        match e.children[..] {
+ *            [] => iter::once(e),
+ *            //ref cs => cs.iter().fold(iter::empty(), |a, c| a.chain(chain_leaves(c)).collect()),
+ *            // TODO
+ *            ref cs => cs.iter().flat_map(|it| it.clone()a.chain(chain_leaves(c)).collect()),
+ *        }
+ *    }
+ */
+
+    fn fold_element_leaves<'a, A>(e: &'a Element, f: impl Fn(&'a Element) -> A) -> Vec<A> {
+        match e.children[..] {
+            [] => vec![f(e)],
+            ref cs => cs
+                .iter()
+                .fold(vec![], |a: Vec<A>, c: &Element| fold_element_leaves(c, &f)),
+        }
     }
 
-    Ok((info, metadata))
+    fn text_names<'a>(el: &'a Element) -> Vec<(Cow<'a, str>, Cow<'a, str>)> {
+        fold_element_leaves(el, text_name)
+            .into_iter()
+            .filter_map(|x| x)
+            .collect()
+    }
+
+    fn text_name<'a>(e: &'a Element) -> Option<(Cow<'a, str>, Cow<'a, str>)> {
+        e.text
+            .as_ref()
+            .map(|ref t| (Cow::from(&e.name), Cow::from(&t[..])))
+    }
+
+    Ok(metadata)
 }
 
 /*
