@@ -1,6 +1,6 @@
 //! Select pages from pdf(s) and concatenate into a single output pdf
 
-use std::ops::RangeInclusive;
+use std::{ops::RangeInclusive, str};
 
 use itertools::{Itertools, MinMaxResult};
 
@@ -79,9 +79,37 @@ pub fn sel(input: InputInOut) -> Result<()> {
 pub fn info(input: &[PDFName]) -> Result<()> {
     let docs = input.iter().filter_map(|x| x.load_doc().ok());
 
-    docs.for_each(|x| println!("{:#?}", x));
+    docs.for_each(|x| println!("{:#?}", get_metadata(&x)));
 
     Ok(())
+}
+
+fn get_metadata(doc: &Document) -> Result<(&Dictionary, &str)> {
+    let trail = &doc.trailer;
+    let info = trail
+        .get("Info")
+        .and_then(Object::as_reference)
+        .error("Couldn’t identify pdf info")
+        .and_then(|r| doc.get_dictionary(r).error("Couldn’t access pdf info"))?;
+
+    let catalog = doc.catalog().error("Couldn’t access catalog")?;
+
+    let metadata = catalog
+        .get("Metadata")
+        .and_then(Object::as_reference)
+        .error("Couldn’t identify metadata")
+        .and_then(|r| {
+            doc.get_object(r)
+                .and_then(Object::as_stream)
+                .error("Couldn’t access metadata")
+        })
+        .and_then(|s| str::from_utf8(&s.content).error("Couldn’t decode utf8"))?;
+
+    fn decode_stream(s: &Stream) -> Result<content::Content> {
+        s.decode_content().error("Couldn’t parse content stream")
+    }
+
+    Ok((info, metadata))
 }
 
 /*
