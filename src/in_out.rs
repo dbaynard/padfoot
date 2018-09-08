@@ -3,6 +3,7 @@
 use std::{ops::RangeInclusive, str};
 
 use itertools::{Itertools, MinMaxResult};
+use xmltree::{Element};
 
 use lopdf::*;
 
@@ -84,7 +85,7 @@ pub fn info(input: &[PDFName]) -> Result<()> {
     Ok(())
 }
 
-fn get_metadata(doc: &Document) -> Result<(&Dictionary, &str)> {
+fn get_metadata(doc: &Document) -> Result<(&Dictionary, Element)> {
     let trail = &doc.trailer;
     let info = trail
         .get("Info")
@@ -103,7 +104,9 @@ fn get_metadata(doc: &Document) -> Result<(&Dictionary, &str)> {
                 .and_then(Object::as_stream)
                 .error("Couldn’t access metadata")
         })
-        .and_then(|s| str::from_utf8(&s.content).error("Couldn’t decode utf8"))?;
+        .map(|s| &s.content)
+        //.and_then(|s| str::from_utf8(&s[54..]).error("Couldn’t decode utf8"))?;
+        .and_then(|s| Element::parse(&s[54..]).chain_err(|| "Couldn’t read xml"))?;
 
     fn decode_stream(s: &Stream) -> Result<content::Content> {
         s.decode_content().error("Couldn’t parse content stream")
