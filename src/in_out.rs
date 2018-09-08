@@ -92,9 +92,8 @@ pub fn info(input: &[PDFName]) -> Result<()> {
             Real(ref f) => Ok(format!("{}", f)),
             Name(v) => String::from_utf8(v.clone()).chain_err(|| "Could not convert as utf8 name"),
             String(v, _fmt) => {
-                let s =
-                    String::from_utf8(v.clone()).chain_err(|| "Could not convert as utf8 string")?;
-                display_trail_date(&s).or_else(|_| Ok(s))
+                let s = String::from_utf8_lossy(v);
+                display_trail_date(&s).or_else(|_| Ok(s.to_string()))
             }
             Array(v) => Ok(v
                 .into_iter()
