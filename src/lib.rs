@@ -6,6 +6,8 @@ extern crate error_chain;
 
 extern crate itertools;
 
+extern crate xmlparser;
+
 extern crate lopdf;
 
 pub mod errors;

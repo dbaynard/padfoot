@@ -1,10 +1,11 @@
 //! Select pages from pdf(s) and concatenate into a single output pdf
 
-use std::{ops::RangeInclusive, str};
+use std::{ops::RangeInclusive, result, str};
 
 use itertools::{Itertools, MinMaxResult};
+use xmlparser::{Token, Tokenizer};
 
-use lopdf::*;
+use lopdf::{Stream, *};
 
 use common::*;
 use errors::*;
@@ -84,7 +85,7 @@ pub fn info(input: &[PDFName]) -> Result<()> {
     Ok(())
 }
 
-fn get_metadata(doc: &Document) -> Result<(&Dictionary, &str)> {
+fn get_metadata(doc: &Document) -> Result<(&Dictionary, Vec<Token>)> {
     let trail = &doc.trailer;
     let info = trail
         .get("Info")
@@ -103,7 +104,12 @@ fn get_metadata(doc: &Document) -> Result<(&Dictionary, &str)> {
                 .and_then(Object::as_stream)
                 .error("Couldn’t access metadata")
         })
-        .and_then(|s| str::from_utf8(&s.content).error("Couldn’t decode utf8"))?;
+        .and_then(|s| str::from_utf8(&s.content).error("Couldn’t decode utf8"))
+        .map(Tokenizer::from)
+        .and_then(|x| {
+            x.collect::<result::Result<Vec<_>, _>>()
+                .error("Couldn’t parse xml")
+        })?;
 
     fn decode_stream(s: &Stream) -> Result<content::Content> {
         s.decode_content().error("Couldn’t parse content stream")
