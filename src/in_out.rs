@@ -81,7 +81,7 @@ pub fn sel(input: InputInOut) -> Result<()> {
 pub fn info(input: &[PDFName]) -> Result<()> {
     let docs = input.iter().filter_map(|x| x.load_doc().ok());
 
-    fn display_object<'a>(o: &'a Object) -> Result<String> {
+    fn display_object<'a>(doc: &'a Document, o: &'a Object) -> Result<String> {
         use lopdf::Object::*;
         use std::string::String;
 
@@ -97,19 +97,23 @@ pub fn info(input: &[PDFName]) -> Result<()> {
             }
             Array(v) => Ok(v
                 .into_iter()
-                .map(display_object)
+                .map(|x| display_object(doc, x))
                 .filter_map(|x| x.ok())
                 .join(",\n")),
             Dictionary(_) => Err("Dictionary".into()),
             Stream(_) => Err("Stream".into()),
-            Reference(_) => Err("Reference".into()),
+            Reference(r) => {
+                let v = doc.get_object(*r).error("Couldn’t follow reference")?;
+                // TODO take care of recursion, somehow?
+                display_object(doc, v)
+            }
         }
     }
 
     docs.map(|x| -> Result<()> {
         let i = get_trail_info(&x)?;
         i.filter_map(|(k, v)| {
-            let d = display_object(v).ok()?;
+            let d = display_object(&x, v).ok()?;
             Some((k, d))
         }).for_each(|(k, v)| println!("{}: {}", k, v));
         Ok(())
@@ -119,7 +123,7 @@ pub fn info(input: &[PDFName]) -> Result<()> {
 }
 
 fn display_trail_date(s: &str) -> Result<String> {
-    DateTime::parse_from_str(&(s.replace("'", "")), "D:%Y%m%d%H%M%S%z")
+    DateTime::parse_from_str(&(s.replace("'", "").replace("Z", "+")), "D:%Y%m%d%H%M%S%z")
         .map(|d| format!("{}", d.format("%a, %d %b %Y %T %z")))
         .or_else(|_| {
             NaiveDateTime::parse_from_str(s, "D:%Y%m%d%H%M%S")
@@ -141,6 +145,10 @@ mod tests {
         assert_eq!(
             display_trail_date("D:20170711121931").unwrap_or_else(|e| format!("{:?}", e)),
             "Tue, 11 Jul 2017 12:19:31"
+        );
+        assert_eq!(
+            display_trail_date("D:20180710153507Z00'00'").unwrap_or_else(|e| format!("{:?}", e)),
+            "Tue, 10 Jul 2018 15:35:07 +0000"
         );
     }
 }
