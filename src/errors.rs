@@ -1,6 +1,10 @@
 use std::result;
 
-error_chain!{}
+error_chain!{
+    foreign_links {
+        Xmltree(::xmltree::ParseError);
+    }
+}
 
 pub trait ErrorChainable<T> {
     fn error(self, e: impl Into<Error>) -> Result<T>;
