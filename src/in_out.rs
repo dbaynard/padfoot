@@ -80,12 +80,16 @@ pub fn sel(input: InputInOut) -> Result<()> {
 pub fn info(input: &[PDFName]) -> Result<()> {
     let docs = input.iter().filter_map(|x| x.load_doc().ok());
 
-    docs.for_each(|x| println!("{:#?}", get_trail_info(&x)));
+    docs.map(|x| -> Result<()> {
+        let i = get_trail_info(&x)?;
+        println!("{:#?}", i.collect::<Vec<_>>());
+        Ok(())
+    }).for_each(drop);
 
     Ok(())
 }
 
-fn get_trail_info(doc: &Document) -> Result<Vec<(&str, &Object)>> {
+fn get_trail_info(doc: &Document) -> Result<impl Iterator<Item =(&str, &Object)>> {
     let trail = &doc.trailer;
 
     let info = trail
@@ -94,7 +98,7 @@ fn get_trail_info(doc: &Document) -> Result<Vec<(&str, &Object)>> {
         .error("Couldn’t identify pdf info")
         .and_then(|r| doc.get_dictionary(r).error("Couldn’t access pdf info"))?;
 
-    Ok(info.iter().map(|(s, o)| (&s[..], o)).collect())
+    Ok(info.iter().map(|(s, o)| (&s[..], o)))
 }
 
 fn get_metadata(doc: &Document) -> Result<Vec<(String, String)>> {
