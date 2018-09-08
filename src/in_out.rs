@@ -85,7 +85,7 @@ pub fn info(input: &[PDFName]) -> Result<()> {
     Ok(())
 }
 
-fn get_trail_info(doc: &Document) -> Result<&Dictionary> {
+fn get_trail_info(doc: &Document) -> Result<Vec<(&str, &Object)>> {
     let trail = &doc.trailer;
 
     let info = trail
@@ -94,7 +94,7 @@ fn get_trail_info(doc: &Document) -> Result<&Dictionary> {
         .error("Couldn’t identify pdf info")
         .and_then(|r| doc.get_dictionary(r).error("Couldn’t access pdf info"))?;
 
-    Ok(info)
+    Ok(info.iter().map(|(s, o)| (&s[..], o)).collect())
 }
 
 fn get_metadata(doc: &Document) -> Result<Vec<(String, String)>> {
