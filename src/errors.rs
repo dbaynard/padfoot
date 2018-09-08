@@ -4,6 +4,7 @@ error_chain!{
     foreign_links {
         Xmltree(::xmltree::ParseError);
         Utf8(::std::str::Utf8Error);
+        Chrono(::chrono::format::ParseError);
     }
 }
 

@@ -2,6 +2,7 @@
 
 use std::{borrow::Cow, iter, ops::RangeInclusive, str, string::String};
 
+use chrono::{DateTime, NaiveDateTime};
 use itertools::{Itertools, MinMaxResult};
 use xmltree::Element;
 
@@ -91,7 +92,9 @@ pub fn info(input: &[PDFName]) -> Result<()> {
             Real(ref f) => Ok(format!("{}", f)),
             Name(v) => String::from_utf8(v.clone()).chain_err(|| "Could not convert as utf8 name"),
             String(v, _fmt) => {
-                String::from_utf8(v.clone()).chain_err(|| "Could not convert as utf8 string")
+                let s =
+                    String::from_utf8(v.clone()).chain_err(|| "Could not convert as utf8 string")?;
+                display_trail_date(&s).or_else(|_| Ok(s))
             }
             Array(v) => Ok(v
                 .into_iter()
@@ -114,6 +117,33 @@ pub fn info(input: &[PDFName]) -> Result<()> {
     }).for_each(drop);
 
     Ok(())
+}
+
+fn display_trail_date(s: &str) -> Result<String> {
+    DateTime::parse_from_str(&(s.replace("'", "")), "D:%Y%m%d%H%M%S%z")
+        .map(|d| format!("{}", d.format("%a, %d %b %Y %T %z")))
+        .or_else(|_| {
+            NaiveDateTime::parse_from_str(s, "D:%Y%m%d%H%M%S")
+                .map(|d| format!("{}", d.format("%a, %d %b %Y %T")))
+        })
+        .chain_err(|| "Couldn’t parse date")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_display_trail_date() {
+        assert_eq!(
+            display_trail_date("D:20170712171035+01'00'").unwrap_or_else(|e| format!("{:?}", e)),
+            "Wed, 12 Jul 2017 17:10:35 +0100"
+        );
+        assert_eq!(
+            display_trail_date("D:20170711121931").unwrap_or_else(|e| format!("{:?}", e)),
+            "Tue, 11 Jul 2017 12:19:31"
+        );
+    }
 }
 
 fn get_trail_info(doc: &Document) -> Result<impl Iterator<Item = (&str, &Object)>> {

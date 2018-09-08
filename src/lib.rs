@@ -6,6 +6,7 @@ extern crate error_chain;
 
 extern crate itertools;
 
+extern crate chrono;
 extern crate xmltree;
 
 extern crate lopdf;
