@@ -46,6 +46,6 @@ impl<'a> From<&'a OsStr> for PDFName {
 impl Display for PDFName {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let s = self.0.to_str().ok_or_else(|| fmt::Error::default())?;
-        write!(f, "{}", s)
+        write!(f, "\"{}\"", s)
     }
 }
