@@ -5,6 +5,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use lopdf::Document;
+
+use errors::*;
+
 #[derive(Debug)]
 pub struct PDFName(PathBuf);
 
@@ -17,6 +21,11 @@ impl PDFName {
 
     pub fn over<A>(&self, f: impl FnOnce(&Path) -> A) -> A {
         f(&self.0)
+    }
+
+    pub fn load_doc(&self) -> Result<Document> {
+        self.over(|x| Document::load(x))
+            .or_else(|_| Err("Couldn’t load document".into()))
     }
 }
 
