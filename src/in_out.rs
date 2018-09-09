@@ -111,6 +111,8 @@ pub fn info(input: &[PDFName]) -> Result<()> {
     let docs = input.iter().filter_map(|x| x.load_doc().ok());
 
     docs.map(|doc| -> Result<()> {
+        // TODO print file name!
+
         let i = get_trail_info(&doc)?;
 
         i.filter_map(|(k, v)| {
