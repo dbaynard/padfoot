@@ -110,8 +110,6 @@ pub fn sel(input: InputInOut) -> Result<()> {
 
 /// Display metadata
 pub fn info(input: &[PDFName]) -> Result<()> {
-    let docs = input.iter().filter_map(|x| x.load_doc().ok());
-
     fn display_object<'a>(doc: &'a Document, o: &'a Object) -> Result<String> {
         use lopdf::Object::*;
         use std::string::String;
@@ -141,12 +139,20 @@ pub fn info(input: &[PDFName]) -> Result<()> {
         }
     }
 
-    docs.map(|x| -> Result<()> {
-        let i = get_trail_info(&x)?;
+    let docs = input.iter().filter_map(|x| x.load_doc().ok());
+
+    docs.map(|doc| -> Result<()> {
+        let i = get_trail_info(&doc)?;
+
         i.filter_map(|(k, v)| {
-            let d = display_object(&x, v).ok()?;
+            let d = display_object(&doc, v).ok()?;
             Some((k, d))
         }).for_each(|(k, v)| println!("{}: {}", k, v));
+
+        let p = page_range(&doc).map(RangeInclusive::into_inner)?;
+
+        println!("Pages: {}–{}", p.0, p.1);
+
         Ok(())
     }).for_each(drop);
 
