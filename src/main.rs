@@ -56,10 +56,10 @@ fn normalize_inputs(
 
     let outfile = output.as_ref()
         .map(|OutputCmd::Output{outfile}| outfile.clone())
-        .ok_or_else::<Error,_>(|| "No explicit output supplied".into())
+        .error("No explicit output supplied")
         // If no explicit output, pop the last input value
         .or_else(|_| inputs.pop()
-            .ok_or_else::<Error,_>(|| "No input supplied.".into())
+            .error("No input supplied.")
             .and_then(|x| match x {
                 InputElement::File(outfile) => Ok(outfile),
                 _ => Err("The arguments must finish with an output file name.".into()),

@@ -6,6 +6,9 @@ extern crate error_chain;
 
 extern crate itertools;
 
+extern crate chrono;
+extern crate xmltree;
+
 extern crate lopdf;
 
 pub mod errors;
@@ -31,6 +34,6 @@ pub fn padfoot(c: Command) -> Result<()> {
         Command::Sel(i) => sel(i),
         Command::Zip(_) => Err("Not implemented yet".into()),
         Command::Burst(_) => Err("Not implemented yet".into()),
-        Command::Info(_) => Err("Not implemented yet".into()),
+        Command::Info(i) => info(&i),
     }
 }
