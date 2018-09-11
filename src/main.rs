@@ -22,7 +22,8 @@ fn main() -> Result<()> {
 
     let cmd = process_options(opt)?;
 
-    println!("{:?}", cmd);
+    // Print the command arguments
+    println!("{}", &cmd);
 
     padfoot(cmd)?;
 

@@ -1,6 +1,14 @@
 //! Select pages from pdf(s) and concatenate into a single output pdf
 
-use std::{borrow::Cow, iter, ops::RangeInclusive, str, string::String};
+use std::{
+    borrow::Cow,
+    fmt,
+    fmt::{Display, Write},
+    iter,
+    ops::RangeInclusive,
+    str,
+    string::String,
+};
 
 use chrono::{DateTime, NaiveDateTime};
 use itertools::{Itertools, MinMaxResult};
@@ -13,6 +21,16 @@ use errors::*;
 
 /// The arguments supplied to the `sel` and `zip` commands.
 pub type InputInOut = InOut<PDFName>;
+
+impl Display for InputInOut {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.inputs
+            .iter()
+            .map(|i| write!(f, " {}", i))
+            .collect::<fmt::Result>()?;
+        write!(f, " output {}", self.outfile)
+    }
+}
 
 /// Input files (with optional ranges) and output file corresponding to the `sel` and `zip`
 /// commands.
@@ -32,6 +50,19 @@ pub struct PDFPages<A> {
     ///
     /// This method should not be exported.
     page_ranges: Vec<RangeInclusive<usize>>,
+}
+
+impl Display for PDFPages<PDFName> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, " {}", self.file)?;
+        self.page_ranges
+            .iter()
+            .cloned()
+            .map(RangeInclusive::into_inner)
+            .map(|(fr, to)| (format!("{}", fr), format!("{}", to)))
+            .map(|(fr, to)| write!(f, " {}-{}", fr, to))
+            .collect()
+    }
 }
 
 impl<A> PDFPages<A> {
