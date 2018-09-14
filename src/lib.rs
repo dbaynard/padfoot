@@ -25,8 +25,8 @@ pub use in_out::*;
 /// The commands supplied to the library
 #[derive(Debug)]
 pub enum Command {
-    Sel(InputInOut),
-    Zip(InputInOut),
+    Sel(InputsWithOutputSpec),
+    Zip(InputsWithOutputSpec),
     Burst(Vec<PDFName>),
     Info(Vec<PDFName>),
 }
