@@ -22,6 +22,8 @@ pub use common::*;
 mod in_out;
 pub use in_out::*;
 
+mod pdf;
+
 /// The commands supplied to the library
 #[derive(Debug)]
 pub enum Command {
