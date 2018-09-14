@@ -1,3 +1,5 @@
+//! Process pdfs
+
 use std::{borrow::Cow, ops::RangeInclusive, str, string::String};
 
 use chrono::{DateTime, NaiveDateTime};
@@ -8,6 +10,7 @@ use lopdf::*;
 
 use errors::*;
 
+/// Pretty print a simple object
 pub fn simple_display_object<'a>(doc: &'a Document, o: &'a Object) -> Result<String> {
     use lopdf::Object::*;
     use std::string::String;
@@ -37,6 +40,7 @@ pub fn simple_display_object<'a>(doc: &'a Document, o: &'a Object) -> Result<Str
     }
 }
 
+/// An iterator of the trail’s contents
 pub fn get_trail_info(doc: &Document) -> Result<impl Iterator<Item = (&str, &Object)>> {
     let trail = &doc.trailer;
 
@@ -118,6 +122,7 @@ pub fn get_metadata(doc: &Document) -> Result<Vec<(String, String)>> {
     Ok(metadata)
 }
 
+/// Pretty print a date, formatted in the pdf trailer
 fn display_trail_date(s: &str) -> Result<String> {
     DateTime::parse_from_str(&(s.replace("'", "").replace("Z", "+")), "D:%Y%m%d%H%M%S%z")
         .map(|d| format!("{}", d.format("%a, %d %b %Y %T %z")))
