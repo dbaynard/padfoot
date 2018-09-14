@@ -1,14 +1,6 @@
 //! Select pages from pdf(s) and concatenate into a single output pdf
 
-use std::{
-    borrow::Cow,
-    fmt,
-    fmt::{Display, Write},
-    marker,
-    ops::RangeInclusive,
-    str,
-    string::String,
-};
+use std::{borrow::Cow, fmt, fmt::Display, marker, ops::RangeInclusive, str, string::String};
 
 use chrono::{DateTime, NaiveDateTime};
 use itertools::{Itertools, MinMaxResult};
@@ -88,7 +80,7 @@ impl PDFPagesSpec {
         }
     }
 
-    fn load_doc(self) -> Option<PDFPagesLoad> {
+    pub fn load_doc(self) -> Option<PDFPagesLoad> {
         // TODO This should never be anything but `This`. How to statically guarantee?
         let file = self.file.these(
             |x| x.load_doc().ok().map(|y| These::These(x, y)),
@@ -131,7 +123,7 @@ impl<T> PDFPages<T> {
 }
 
 /// Run the input
-pub fn sel(input: InputsWithOutputSpec) -> Result<()> {
+pub fn sel(_input: InputsWithOutputSpec) -> Result<()> {
     //let sels = load_docs(input);
 
     //Ok(Document::new());
@@ -238,7 +230,7 @@ fn get_trail_info(doc: &Document) -> Result<impl Iterator<Item = (&str, &Object)
     Ok(info.iter().map(|(s, o)| (&s[..], o)))
 }
 
-fn get_metadata(doc: &Document) -> Result<Vec<(String, String)>> {
+pub fn get_metadata(doc: &Document) -> Result<Vec<(String, String)>> {
     let catalog = doc.catalog().error("Couldn’t access catalog")?;
 
     let metadata = catalog
@@ -275,7 +267,7 @@ fn get_metadata(doc: &Document) -> Result<Vec<(String, String)>> {
             [] => vec![f(e)],
             ref cs => cs
                 .iter()
-                .fold(vec![], |a: Vec<A>, c: &Element| fold_element_leaves(c, &f)),
+                .fold(vec![], |_a: Vec<A>, c: &Element| fold_element_leaves(c, &f)),
         }
     }
 
