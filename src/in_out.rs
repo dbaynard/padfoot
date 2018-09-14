@@ -4,7 +4,7 @@ use std::{
     borrow::Cow,
     fmt,
     fmt::{Display, Write},
-    iter,
+    marker,
     ops::RangeInclusive,
     str,
     string::String,
@@ -20,9 +20,9 @@ use common::*;
 use errors::*;
 
 /// The arguments supplied to the `sel` and `zip` commands.
-pub type InputInOut = InOut<PDFName>;
+pub type InputsWithOutputSpec = InputsWithOutput<NotLoaded>;
 
-impl Display for InputInOut {
+impl Display for InputsWithOutputSpec {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.inputs
             .iter()
@@ -35,26 +35,39 @@ impl Display for InputInOut {
 /// Input files (with optional ranges) and output file corresponding to the `sel` and `zip`
 /// commands.
 #[derive(Debug)]
-pub struct InOut<A> {
-    pub inputs: Vec<PDFPages<A>>,
+pub struct InputsWithOutput<T> {
+    pub inputs: Vec<PDFPages<T>>,
     pub outfile: PDFName,
 }
 
+type File = These<PDFName, Document>;
+
 #[derive(Debug)]
-pub struct PDFPages<A> {
-    /// Typically, this will be either a filename, document, or reference thereof.
-    file: A,
+pub struct PDFPages<T> {
+    /// This will be either a filename, document, or both.
+    file: File,
     /// This relates to the `file`.
     /// An empty list corresponds to the full file.
     /// Otherwise, a list corresponds to the pages in the file.
     ///
     /// This method should not be exported.
     page_ranges: Vec<RangeInclusive<usize>>,
+    _marker: marker::PhantomData<T>,
 }
 
-impl Display for PDFPages<PDFName> {
+#[derive(Debug)]
+pub enum NotLoaded {}
+
+#[derive(Debug)]
+pub enum Loaded {}
+
+/// The specification
+pub type PDFPagesSpec = PDFPages<NotLoaded>;
+pub type PDFPagesLoad = PDFPages<Loaded>;
+
+impl Display for PDFPagesSpec {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, " {}", self.file)?;
+        self.file.do_this(|name| write!(f, " {}", name))?;
         self.page_ranges
             .iter()
             .cloned()
@@ -65,42 +78,60 @@ impl Display for PDFPages<PDFName> {
     }
 }
 
-impl<A> PDFPages<A> {
+impl PDFPagesSpec {
     /// Create new `PDFPages` value corresponding to the full page range.
-    pub fn new(file: A) -> PDFPages<A> {
+    pub fn new(name: PDFName) -> PDFPagesSpec {
         PDFPages {
-            file,
+            file: These::This(name),
             page_ranges: vec![],
+            _marker: marker::PhantomData,
         }
     }
 
+    fn load_doc(self) -> Option<PDFPagesLoad> {
+        // TODO This should never be anything but `This`. How to statically guarantee?
+        let file = self.file.these(
+            |x| x.load_doc().ok().map(|y| These::These(x, y)),
+            |_| None,
+            |_, _| None,
+        )?;
+
+        Some(PDFPages {
+            file,
+            page_ranges: self.page_ranges,
+            _marker: marker::PhantomData,
+        })
+    }
+}
+
+impl<T> PDFPages<T> {
     pub fn push_range(&mut self, range: &RangeInclusive<usize>) {
         self.page_ranges.push(range.clone());
     }
 
-    pub fn map<B>(self, f: impl FnOnce(A) -> B) -> PDFPages<B> {
-        let page_ranges = self.page_ranges;
+    pub fn map(self, f: impl FnOnce(File) -> File) -> PDFPages<T> {
         let file = f(self.file);
 
-        PDFPages { file, page_ranges }
+        PDFPages {
+            file,
+            page_ranges: self.page_ranges,
+            _marker: marker::PhantomData,
+        }
     }
 
-    pub fn traverse<B>(self, f: impl FnOnce(A) -> Result<B>) -> Result<PDFPages<B>> {
-        let page_ranges = self.page_ranges;
+    pub fn traverse(self, f: impl FnOnce(File) -> Result<File>) -> Result<PDFPages<T>> {
         let file = f(self.file)?;
 
-        Ok(PDFPages { file, page_ranges })
-    }
-}
-
-impl PDFPages<PDFName> {
-    fn load_doc(self) -> Option<PDFPages<Document>> {
-        self.traverse(|x| x.load_doc()).ok()
+        Ok(PDFPages {
+            file,
+            page_ranges: self.page_ranges,
+            _marker: marker::PhantomData,
+        })
     }
 }
 
 /// Run the input
-pub fn sel(input: InputInOut) -> Result<()> {
+pub fn sel(input: InputsWithOutputSpec) -> Result<()> {
     //let sels = load_docs(input);
 
     //Ok(Document::new());

@@ -51,7 +51,7 @@ fn process_options(opt: Opt) -> Result<Command> {
 fn normalize_inputs(
     inp: &mut Inputs,
     output: &Option<OutputCmd>,
-    f: impl Fn(InputInOut) -> Command,
+    f: impl Fn(InputsWithOutputSpec) -> Command,
 ) -> Result<Command> {
     let inputs = &mut inp.inputs;
 
@@ -70,7 +70,7 @@ fn normalize_inputs(
     let inputs = group_inputs(&inputs)?;
     let outfile = PDFName::new(&outfile);
 
-    Ok(f(InOut { inputs, outfile }))
+    Ok(f(InputsWithOutput { inputs, outfile }))
 }
 
 /// The input list contains a mix of filenames and page ranges.
@@ -82,8 +82,8 @@ fn normalize_inputs(
 /// TODO
 /// Check list is non empty (inc. after getting the output file name)
 /// Check list begins with filename
-fn group_inputs(is: &[InputElement]) -> Result<Vec<PDFPages<PDFName>>> {
-    type Res = Result<Vec<PDFPages<PDFName>>>;
+fn group_inputs(is: &[InputElement]) -> Result<Vec<PDFPagesSpec>> {
+    type Res = Result<Vec<PDFPagesSpec>>;
 
     fn input_algebra(mut rz: Res, i: &InputElement) -> Res {
         match i {
