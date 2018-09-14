@@ -19,8 +19,8 @@ use errors::*;
 mod common;
 pub use common::*;
 
-mod in_out;
-pub use in_out::*;
+mod commands;
+pub use commands::*;
 
 mod pdf;
 
