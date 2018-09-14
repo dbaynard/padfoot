@@ -132,7 +132,7 @@ pub fn sel(_input: InputsWithOutputSpec) -> Result<()> {
 pub fn info(input: &[PDFName]) -> Result<()> {
     let docs = input
         .iter()
-        .filter_map(|x| x.load_doc().ok().map(|y| (x, y)));
+        .filter_map(|name| name.load_doc().ok().map(|doc| (name, doc)));
 
     docs.map(|(name, doc)| -> Result<()> {
         println!();
