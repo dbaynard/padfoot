@@ -9,6 +9,7 @@ extern crate itertools;
 extern crate chrono;
 extern crate xmltree;
 
+#[macro_use]
 extern crate lopdf;
 
 use std::{fmt, fmt::Display};

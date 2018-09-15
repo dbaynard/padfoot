@@ -61,6 +61,7 @@ pub fn page_range(doc: &Document) -> Result<RangeInclusive<u32>> {
         // TODO Should assert no error here
         MinMaxResult::NoElements => Err("No pages in pdf".into()),
         MinMaxResult::OneElement(&el) => Ok(el..=el),
+        // TODO need to ensure max ≥ min
         MinMaxResult::MinMax(&min, &max) => Ok(min..=max),
     }
 }

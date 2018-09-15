@@ -167,28 +167,100 @@ pub fn burst(input: &[PDFName]) -> Result<()> {
 
         let pages = doc.get_pages();
 
-        pages.iter().for_each(|(no, &oid)| {
-            use lopdf::Dictionary;
-            use std::iter::FromIterator;
+        let pp = page_range(&doc)?;
 
-            println!("Page {}", no);
-            let contents = doc.get_page_contents(oid);
-            let resources = doc.get_page_resources(oid);
-            let fonts = doc
-                .get_page_fonts(oid)
-                .into_iter()
-                .map(|(s, d)| (s, Object::from(d.clone())));
+        let max_pages = match pp.into_inner() {
+            (s, e) => {
+                // Check underflow
+                debug_assert!(e >= s);
+                e + 1 - s
+            }
+        };
 
-            let mut new = Document::new();
+        let print_suffix_width = f64::ceil(f64::log10(max_pages as f64)) as usize;
 
-            let pages_id = new.new_object_id();
+        let name_prefix = name.file_stem();
 
-            let new_fonts: Dictionary = FromIterator::from_iter(fonts);
+        // Prefix and suffix, plus `_` and ".pdf"
+        // TODO check overflow?
+        let print_name_width = name_prefix.as_os_str().len() + print_suffix_width + 5;
 
-            let font_id = new.add_object(new_fonts);
+        pages
+            .iter()
+            .map(|(no, &oid)| -> Result<()> {
+                use lopdf::Dictionary;
+                use std::{fmt::Write, iter, iter::FromIterator};
 
-            //let resources_id = new.add_object(resources);
-        });
+                println!("Page {}", no);
+                //let contents = doc.get_page_contents(oid);
+                //let resources = doc.get_page_resources(oid);
+                let fonts = doc
+                    .get_page_fonts(oid)
+                    .into_iter()
+                    .map(|(s, d)| (s, Object::from(d.clone())));
+
+                let mut new = Document::new();
+
+                let pages_id = new.new_object_id();
+
+                let new_fonts: Dictionary = FromIterator::from_iter(fonts);
+
+                let font_id = new.add_object(new_fonts);
+
+                let new_page = doc
+                    .get_dictionary(oid)
+                    .error("Couldn’t locate page dictionary")?;
+
+                let content_id = new_page
+                    .get("Contents")
+                    .error("Couldn't identify page contents")?;
+
+                let media_box = new_page.get("MediaBox").error("Couldn’t get media box")?;
+
+                //let resources_id = new.add_object(resources);
+
+                let page_id = new.add_object(dictionary! {
+                    "Type" => "Page",
+                    "Parent" => pages_id,
+                    "Contents" => content_id.clone(),
+                });
+
+                let pages = dictionary! {
+                    "Type" => "Pages",
+                    "Kids" => vec![page_id.into()],
+                    "Count" => 1,
+                    //"Resources" => resources_id,
+                    "MediaBox" => media_box.clone(),
+                    // "MediaBox" => vec![0.into(), 0.into(), 595.into(), 842.into()],
+                };
+
+                new.objects.insert(pages_id, Object::Dictionary(pages));
+
+                let catalog_id = new.add_object(dictionary! {
+                    "Type" => "Catalog",
+                    "Pages" => pages_id,
+                });
+
+                new.trailer.set("Root", catalog_id);
+
+                new.compress();
+
+                // Could just use format! here but given we already know the size of the name, why not
+                // do it explicitly.
+                let mut new_name = String::with_capacity(print_name_width);
+                write!(
+                    new_name,
+                    "{}_{:0width$}.pdf",
+                    name_prefix.display(),
+                    no,
+                    width = print_suffix_width
+                );
+
+                new.save(new_name).chain_err(|| "Couldn’t save file")?;
+
+                Ok(())
+            })
+            .for_each(drop);
 
         Ok(())
     }).for_each(drop);
