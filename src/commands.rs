@@ -136,7 +136,7 @@ pub fn info(input: &[PDFName]) -> Result<()> {
 
     docs.map(|(name, doc)| -> Result<()> {
         println!();
-        println!("File: {}", name);
+        println!("File: {}", &name);
 
         let i = get_trail_info(&doc)?;
 
@@ -148,6 +148,47 @@ pub fn info(input: &[PDFName]) -> Result<()> {
         let p = page_range(&doc).map(RangeInclusive::into_inner)?;
 
         println!("Pages: {}–{}", p.0, p.1);
+
+        Ok(())
+    }).for_each(drop);
+
+    Ok(())
+}
+
+/// Burst pdf files into individual pages, named as the original, with a numerical suffix.
+pub fn burst(input: &[PDFName]) -> Result<()> {
+    let docs = input
+        .iter()
+        .filter_map(|name| name.load_doc().ok().map(|doc| (name, doc)));
+
+    docs.map(|(name, doc)| -> Result<()> {
+        println!();
+        println!("File: {}", &name);
+
+        let pages = doc.get_pages();
+
+        pages.iter().for_each(|(no, &oid)| {
+            use lopdf::Dictionary;
+            use std::iter::FromIterator;
+
+            println!("Page {}", no);
+            let contents = doc.get_page_contents(oid);
+            let resources = doc.get_page_resources(oid);
+            let fonts = doc
+                .get_page_fonts(oid)
+                .into_iter()
+                .map(|(s, d)| (s, Object::from(d.clone())));
+
+            let mut new = Document::new();
+
+            let pages_id = new.new_object_id();
+
+            let new_fonts: Dictionary = FromIterator::from_iter(fonts);
+
+            let font_id = new.add_object(new_fonts);
+
+            //let resources_id = new.add_object(resources);
+        });
 
         Ok(())
     }).for_each(drop);
