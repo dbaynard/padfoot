@@ -4,10 +4,63 @@ use std::{ops::RangeInclusive, str, string::String};
 
 use chrono::{DateTime, NaiveDateTime};
 use itertools::{Itertools, MinMaxResult};
+use linked_hash_map::LinkedHashMap;
 
 use lopdf::*;
 
 use errors::*;
+
+#[derive(Clone, Debug)]
+pub enum PDFTree<'a> {
+    Null,
+    Boolean(bool),
+    Integer(i64),
+    Real(f64),
+    Name(&'a [u8]),
+    String(&'a [u8], &'a StringFormat),
+    Array(Vec<Box<PDFTree<'a>>>),
+    Dictionary(PDFDictionary<'a>),
+    Stream(&'a Stream),
+    Reference(Box<PDFTree<'a>>),
+}
+
+impl<'a> PDFTree<'a> {
+    pub fn new(doc: &'a Document, o: &'a Object) -> Self {
+        match o {
+            Object::Null => PDFTree::Null,
+            Object::Boolean(b) => PDFTree::Boolean(*b),
+            Object::Integer(i) => PDFTree::Integer(*i),
+            Object::Real(f) => PDFTree::Real(*f),
+            Object::Name(v) => PDFTree::Name(v.as_ref()),
+            Object::String(v, f) => PDFTree::String(v.as_ref(), f),
+            Object::Array(v) => {
+                let arr = v.iter().map(|x| Box::new(PDFTree::new(doc, x))).collect();
+                PDFTree::Array(arr)
+            }
+            Object::Dictionary(d) => PDFTree::Dictionary(PDFDictionary::new(doc, d)),
+            Object::Stream(s) => PDFTree::Stream(&s),
+            Object::Reference(oid) => doc
+                .get_object(*oid)
+                .map(|x| PDFTree::Reference(Box::new(PDFTree::new(doc, x))))
+                .unwrap_or_else(|| PDFTree::Null),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct PDFDictionary<'a>(LinkedHashMap<&'a str, PDFTree<'a>>);
+
+impl<'a> PDFDictionary<'a> {
+    pub fn new(doc: &'a Document, d: &'a Dictionary) -> PDFDictionary<'a> {
+        let mut dict = LinkedHashMap::new();
+
+        d.iter().for_each(|(s, o)| {
+            dict.insert(s.as_ref(), PDFTree::new(doc, o));
+        });
+
+        PDFDictionary(dict)
+    }
+}
 
 /// Pretty print a simple object
 pub fn simple_display_object<'a>(doc: &'a Document, o: &'a Object) -> Result<String> {

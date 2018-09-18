@@ -5,6 +5,7 @@
 extern crate error_chain;
 
 extern crate itertools;
+extern crate linked_hash_map;
 
 extern crate chrono;
 extern crate xmltree;

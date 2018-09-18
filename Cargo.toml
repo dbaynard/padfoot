@@ -20,6 +20,7 @@ combine = "3.5.1"
 itertools = "0.7.8"
 xmltree = "0.8.0"
 chrono = "0.4.6"
+linked-hash-map = "0.5.1"
 
 [dev-dependencies]
 quickcheck = "0.7.1"
