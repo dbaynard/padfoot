@@ -188,41 +188,69 @@ pub fn burst(input: &[PDFName]) -> Result<()> {
         pages
             .iter()
             .map(|(no, &oid)| -> Result<()> {
-                use lopdf::Dictionary;
-                use std::{fmt::Write, iter, iter::FromIterator};
+                use std::{borrow::Cow, fmt::Write};
 
                 println!("Page {}", no);
-                //let contents = doc.get_page_contents(oid);
-                //let resources = doc.get_page_resources(oid);
-                let fonts = doc
-                    .get_page_fonts(oid)
-                    .into_iter()
-                    .map(|(s, d)| (s, Object::from(d.clone())));
+                /*
+                 *let fonts = doc
+                 *    .get_page_fonts(oid)
+                 *    .into_iter()
+                 *    .map(|(s, d)| (s, Object::from(d.clone())));
+                 *
+                 *let new_fonts: Dictionary = FromIterator::from_iter(fonts);
+                 *
+                 *let font_id = new.add_object(new_fonts);
+                 */
 
                 let mut new = Document::new();
 
                 let pages_id = new.new_object_id();
 
-                let new_fonts: Dictionary = FromIterator::from_iter(fonts);
-
-                let font_id = new.add_object(new_fonts);
-
                 let new_page = doc
                     .get_dictionary(oid)
                     .error("Couldn’t locate page dictionary")?;
 
-                let content_id = new_page
-                    .get("Contents")
-                    .error("Couldn't identify page contents")?;
+                /*
+                 *let content_id = new_page
+                 *    .get("Contents")
+                 *    .error("Couldn't identify page contents")?;
+                 */
+
+                let contents = doc
+                    .get_page_content(oid)
+                    .chain_err(|| "Couldn't find contexts")?;
+
+                let content_id = new.add_object(Stream::new(dictionary!{}, contents));
 
                 let media_box = new_page.get("MediaBox").error("Couldn’t get media box")?;
 
-                //let resources_id = new.add_object(resources);
+                fn pack_resources<'a, 'b>(
+                    doc: &'a Document,
+                    rs: &'b [ObjectId],
+                ) -> Result<Cow<'a, Object>> {
+                    match rs {
+                        [] => Err("No resources".into()),
+                        [r] => doc
+                            .get_object(*r)
+                            .map(Cow::Borrowed)
+                            .error("Couldn't get resources"),
+                        rs => Ok(Cow::Owned(Object::Array(
+                            rs.iter()
+                                .filter_map(|x| doc.get_object(*x))
+                                .map(|x| x.clone())
+                                .collect(),
+                        ))),
+                    }
+                }
+
+                let resources = pack_resources(&doc, &doc.get_page_resources(oid))?;
+
+                let resources_id = new.add_object(resources.into_owned());
 
                 let page_id = new.add_object(dictionary! {
                     "Type" => "Page",
                     "Parent" => pages_id,
-                    "Contents" => content_id.clone(),
+                    "Contents" => content_id,
                 });
 
                 let pages = dictionary! {
