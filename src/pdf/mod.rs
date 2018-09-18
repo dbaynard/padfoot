@@ -45,13 +45,45 @@ impl<'a> PDFTree<'a> {
                 .unwrap_or_else(|| PDFTree::Null),
         }
     }
+
+    fn unfold(&self, doc: &mut Document) -> Object {
+        match self {
+            PDFTree::Null => Object::Null,
+            PDFTree::Boolean(b) => Object::Boolean(*b),
+            PDFTree::Integer(i) => Object::Integer(*i),
+            PDFTree::Real(f) => Object::Real(*f),
+            PDFTree::Name(v) => Object::Name(v.to_vec()),
+            PDFTree::String(v, f) => Object::String(v.to_vec(), (*f).clone()),
+            PDFTree::Array(v) => {
+                let arr = v.iter().map(|x| x.unfold(doc)).collect();
+                Object::Array(arr)
+            }
+            PDFTree::Dictionary(d) => {
+                let mut dict = Dictionary::new();
+                d.0
+                    .iter()
+                    .for_each(|(&s, tree)| dict.set(s.clone(), tree.unfold(doc)));
+                Object::Dictionary(dict)
+            }
+            PDFTree::Stream(s) => Object::Stream((*s).clone()),
+            PDFTree::Reference(tree) => {
+                let oid = tree.reference(doc);
+                Object::Reference(oid)
+            }
+        }
+    }
+
+    pub fn reference(&self, doc: &mut Document) -> ObjectId {
+        let new_object = self.unfold(doc);
+        doc.add_object(new_object)
+    }
 }
 
 #[derive(Clone, Debug)]
 pub struct PDFDictionary<'a>(LinkedHashMap<&'a str, PDFTree<'a>>);
 
 impl<'a> PDFDictionary<'a> {
-    pub fn new(doc: &'a Document, d: &'a Dictionary) -> PDFDictionary<'a> {
+    pub fn new(doc: &'a Document, d: &'a Dictionary) -> Self {
         let mut dict = LinkedHashMap::new();
 
         d.iter().for_each(|(s, o)| {
@@ -59,6 +91,10 @@ impl<'a> PDFDictionary<'a> {
         });
 
         PDFDictionary(dict)
+    }
+
+    fn empty() -> Self {
+        PDFDictionary(LinkedHashMap::new())
     }
 }
 
