@@ -76,13 +76,7 @@ impl<'a> PDFTree<'a> {
                 let arr = v.iter().map(|x| x.unfold(doc)).collect();
                 Object::Array(arr)
             }
-            PDFTree::Dictionary(d) => {
-                let mut dict = Dictionary::new();
-                d.0
-                    .iter()
-                    .for_each(|(&s, tree)| dict.set(s.clone(), tree.unfold(doc)));
-                Object::Dictionary(dict)
-            }
+            PDFTree::Dictionary(d) => d.fold(doc),
             PDFTree::Stream(s) => Object::Stream((*s).clone()),
             PDFTree::Reference(oid) => Object::Reference(*oid),
             PDFTree::SubTree(tree) => {
@@ -116,6 +110,14 @@ impl<'a> PDFDictionary<'a> {
 
     fn empty() -> Self {
         PDFDictionary(LinkedHashMap::new())
+    }
+
+    fn fold(&self, doc: &mut Document) -> Object {
+        let mut dict = Dictionary::new();
+        self.0
+            .iter()
+            .for_each(|(&s, tree)| dict.set(s.clone(), tree.unfold(doc)));
+        Object::Dictionary(dict)
     }
 }
 
