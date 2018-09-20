@@ -106,7 +106,9 @@ impl<'a> PDFDictionary<'a> {
         let mut dict = LinkedHashMap::new();
 
         d.iter().for_each(|(s, o)| {
-            dict.insert(s.as_ref(), PDFTree::fold(doc, o, seen));
+            if s != "Parent" {
+                dict.insert(s.as_ref(), PDFTree::fold(doc, o, seen));
+            }
         });
 
         PDFDictionary(dict)
