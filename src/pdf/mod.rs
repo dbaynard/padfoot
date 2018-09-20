@@ -1,6 +1,6 @@
 //! Process pdfs
 
-use std::{ops::RangeInclusive, str, string::String};
+use std::{collections::btree_set::BTreeSet, ops::RangeInclusive, str, string::String};
 
 use chrono::{DateTime, NaiveDateTime};
 use itertools::{Itertools, MinMaxResult};
@@ -19,13 +19,21 @@ pub enum PDFTree<'a> {
     Name(&'a [u8]),
     String(&'a [u8], &'a StringFormat),
     Array(Vec<Box<PDFTree<'a>>>),
-    Dictionary(PDFDictionary<'a>),
+    Dictionary(Box<PDFDictionary<'a>>),
     Stream(&'a Stream),
-    Reference(Box<PDFTree<'a>>),
+    Reference(ObjectId),
+    SubTree(Box<PDFTree<'a>>),
 }
 
 impl<'a> PDFTree<'a> {
-    pub fn new(doc: &'a Document, o: &'a Object) -> Self {
+    pub fn new(doc: &'a Document, o: &'a Object, oid: ObjectId) -> Self {
+        let mut seen = BTreeSet::new();
+        seen.insert(oid);
+
+        PDFTree::fold(doc, o, &mut seen)
+    }
+
+    fn fold(doc: &'a Document, o: &'a Object, seen: &mut BTreeSet<ObjectId>) -> Self {
         match o {
             Object::Null => PDFTree::Null,
             Object::Boolean(b) => PDFTree::Boolean(*b),
@@ -34,15 +42,25 @@ impl<'a> PDFTree<'a> {
             Object::Name(v) => PDFTree::Name(v.as_ref()),
             Object::String(v, f) => PDFTree::String(v.as_ref(), f),
             Object::Array(v) => {
-                let arr = v.iter().map(|x| Box::new(PDFTree::new(doc, x))).collect();
+                let arr = v
+                    .iter()
+                    .map(|x| Box::new(PDFTree::fold(doc, x, seen)))
+                    .collect();
                 PDFTree::Array(arr)
             }
-            Object::Dictionary(d) => PDFTree::Dictionary(PDFDictionary::new(doc, d)),
+            Object::Dictionary(d) => {
+                PDFTree::Dictionary(Box::new(PDFDictionary::new(doc, d, seen)))
+            }
             Object::Stream(s) => PDFTree::Stream(&s),
-            Object::Reference(oid) => doc
-                .get_object(*oid)
-                .map(|x| PDFTree::Reference(Box::new(PDFTree::new(doc, x))))
-                .unwrap_or_else(|| PDFTree::Null),
+            Object::Reference(oid) => match seen.contains(oid) {
+                true => PDFTree::Reference(*oid),
+                false => {
+                    seen.insert(*oid);
+                    doc.get_object(*oid)
+                        .map(|x| PDFTree::SubTree(Box::new(PDFTree::fold(doc, x, seen))))
+                        .unwrap_or_else(|| PDFTree::Null)
+                }
+            },
         }
     }
 
@@ -66,7 +84,8 @@ impl<'a> PDFTree<'a> {
                 Object::Dictionary(dict)
             }
             PDFTree::Stream(s) => Object::Stream((*s).clone()),
-            PDFTree::Reference(tree) => {
+            PDFTree::Reference(oid) => Object::Reference(*oid),
+            PDFTree::SubTree(tree) => {
                 let oid = tree.reference(doc);
                 Object::Reference(oid)
             }
@@ -83,11 +102,11 @@ impl<'a> PDFTree<'a> {
 pub struct PDFDictionary<'a>(LinkedHashMap<&'a str, PDFTree<'a>>);
 
 impl<'a> PDFDictionary<'a> {
-    pub fn new(doc: &'a Document, d: &'a Dictionary) -> Self {
+    fn new(doc: &'a Document, d: &'a Dictionary, seen: &mut BTreeSet<ObjectId>) -> Self {
         let mut dict = LinkedHashMap::new();
 
         d.iter().for_each(|(s, o)| {
-            dict.insert(s.as_ref(), PDFTree::new(doc, o));
+            dict.insert(s.as_ref(), PDFTree::fold(doc, o, seen));
         });
 
         PDFDictionary(dict)

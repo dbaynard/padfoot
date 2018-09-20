@@ -206,7 +206,7 @@ pub fn burst(input: &[PDFName]) -> Result<()> {
                     .get("MediaBox")
                     .error("Couldn’t get media box")?;
 
-                let new_page = PDFTree::new(&doc, old_page);
+                let new_page = PDFTree::new(&doc, old_page, oid);
 
                 let page_id = new_page.reference(&mut new);
 
