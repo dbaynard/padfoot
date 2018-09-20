@@ -15,11 +15,24 @@ pub use these::*;
 #[derive(Debug)]
 pub struct PDFName(PathBuf);
 
-/// TODO
-/// Ensure this corresponds to valid file
+/// A PDFName is the base name (stem) of a pdf file (i.e. no extension)
+///
+/// TODO Does it have further path pieces?
+/// TODO Ensure this corresponds to valid file
 impl PDFName {
     pub fn new(pb: &Path) -> Self {
         PDFName(pb.to_path_buf())
+    }
+
+    pub fn parse(os: &OsStr) -> Self {
+        PDFName::new(os.as_ref())
+    }
+
+    pub fn file_stem<'a>(&'a self) -> &'a Path {
+        let p = &self.0;
+        p.file_stem().map(|s| s.as_ref()).unwrap_or(p)
+        // TODO Work out why the following doesn't work (the error is the `over` method)
+        // self.over(|p| p.file_stem().map(|s| s.as_ref()).unwrap_or(p))
     }
 
     pub fn over<A>(&self, f: impl FnOnce(&Path) -> A) -> A {

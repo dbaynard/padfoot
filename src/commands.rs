@@ -136,7 +136,7 @@ pub fn info(input: &[PDFName]) -> Result<()> {
 
     docs.map(|(name, doc)| -> Result<()> {
         println!();
-        println!("File: {}", name);
+        println!("File: {}", &name);
 
         let i = get_trail_info(&doc)?;
 
@@ -148,6 +148,82 @@ pub fn info(input: &[PDFName]) -> Result<()> {
         let p = page_range(&doc).map(RangeInclusive::into_inner)?;
 
         println!("Pages: {}–{}", p.0, p.1);
+
+        Ok(())
+    }).for_each(drop);
+
+    Ok(())
+}
+
+/// Burst pdf files into individual pages, named as the original, with a numerical suffix.
+pub fn burst(input: &[PDFName]) -> Result<()> {
+    let docs = input
+        .iter()
+        .filter_map(|name| name.load_doc().ok().map(|doc| (name, doc)));
+
+    docs.map(|(name, doc)| -> Result<()> {
+        println!();
+        println!("File: {}", &name);
+
+        let pages = doc.get_pages();
+
+        let pp = page_range(&doc)?;
+
+        let max_pages = match pp.into_inner() {
+            (s, e) => {
+                // Check underflow
+                debug_assert!(e >= s);
+                e + 1 - s
+            }
+        };
+
+        let print_suffix_width = f64::ceil(f64::log10(max_pages as f64)) as usize;
+
+        let name_prefix = name.file_stem();
+
+        // Prefix and suffix, plus `_` and ".pdf"
+        // TODO check overflow?
+        let print_name_width = name_prefix.as_os_str().len() + print_suffix_width + 5;
+
+        pages
+            .iter()
+            .map(|(no, &oid)| -> Result<()> {
+                use std::fmt::Write;
+
+                println!("Page {}", no);
+
+                let mut new = Document::new();
+
+                let pages_id = new.new_object_id();
+
+                let new_page = PDFTree::new(oid, &doc)?;
+
+                let page_id = new_page.link_reference(&mut new, &pages_id);
+
+                let pages = new_pages_dict(&[page_id]);
+
+                new.objects.insert(pages_id, Object::Dictionary(pages));
+
+                make_catalog(&mut new, &pages_id);
+
+                new.compress();
+
+                // Could just use format! here but given we already know the size of the name, why not
+                // do it explicitly.
+                let mut new_name = String::with_capacity(print_name_width);
+                write!(
+                    new_name,
+                    "{}_{:0width$}.pdf",
+                    name_prefix.display(),
+                    no,
+                    width = print_suffix_width
+                ).chain_err(|| "Couldn’t construct filename")?;
+
+                new.save(new_name).chain_err(|| "Couldn’t save file")?;
+
+                Ok(())
+            })
+            .for_each(drop);
 
         Ok(())
     }).for_each(drop);

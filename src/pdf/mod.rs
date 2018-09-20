@@ -1,14 +1,35 @@
 //! Process pdfs
 
-use std::{borrow::Cow, ops::RangeInclusive, str, string::String};
+use std::{ops::RangeInclusive, str, string::String};
 
 use chrono::{DateTime, NaiveDateTime};
 use itertools::{Itertools, MinMaxResult};
-use xmltree::Element;
 
 use lopdf::*;
 
 use errors::*;
+
+pub mod tree;
+pub use self::tree::*;
+
+/// Create pages dictionary
+pub fn new_pages_dict(v: &[ObjectId]) -> Dictionary {
+    dictionary! {
+        "Type" => "Pages",
+        "Kids" => v.into_iter().map(|oid| Object::from(*oid)).collect::<Vec<_>>(),
+        "Count" => Object::from(v.len() as u32),
+    }
+}
+
+/// Create and insert catalogue, supplying the `ObjectId` of the Pages dictionary.
+pub fn make_catalog(doc: &mut Document, pages_id: &ObjectId) {
+    let catalog_id = doc.add_object(dictionary! {
+        "Type" => "Catalog",
+        "Pages" => *pages_id,
+    });
+
+    doc.trailer.set("Root", catalog_id);
+}
 
 /// Pretty print a simple object
 pub fn simple_display_object<'a>(doc: &'a Document, o: &'a Object) -> Result<String> {
@@ -61,66 +82,67 @@ pub fn page_range(doc: &Document) -> Result<RangeInclusive<u32>> {
         // TODO Should assert no error here
         MinMaxResult::NoElements => Err("No pages in pdf".into()),
         MinMaxResult::OneElement(&el) => Ok(el..=el),
+        // TODO need to ensure max ≥ min
         MinMaxResult::MinMax(&min, &max) => Ok(min..=max),
     }
 }
 
-pub fn get_metadata(doc: &Document) -> Result<Vec<(String, String)>> {
-    let catalog = doc.catalog().error("Couldn’t access catalog")?;
-
-    let metadata = catalog
-        .get("Metadata")
-        .and_then(Object::as_reference)
-        .error("Couldn’t identify metadata")
-        .and_then(|r| {
-            doc.get_object(r)
-                .and_then(Object::as_stream)
-                .error("Couldn’t access metadata")
-        })
-        .map(|s| &s.content)
-        //.and_then(|s| str::from_utf8(&s[54..]).error("Couldn’t decode utf8"))?;
-        .and_then(|s| Element::parse(&s[54..]).chain_err(|| "Couldn’t read xml"))
-        .map(|e| text_names(&e).into_iter().map(|(n,t)| (n.into_owned(), t.into_owned())).collect())?;
-
-    /*
-     *    fn decode_stream(s: &Stream) -> Result<content::Content> {
-     *        s.decode_content().error("Couldn’t parse content stream")
-     *    }
-     *
-     *    fn chain_leaves<A>(e: &Element) -> impl Iterator<Item = &Element> {
-     *        match e.children[..] {
-     *            [] => iter::once(e),
-     *            //ref cs => cs.iter().fold(iter::empty(), |a, c| a.chain(chain_leaves(c)).collect()),
-     *            // TODO
-     *            ref cs => cs.iter().flat_map(|it| it.clone()a.chain(chain_leaves(c)).collect()),
-     *        }
-     *    }
-     */
-
-    fn fold_element_leaves<'a, A>(e: &'a Element, f: impl Fn(&'a Element) -> A) -> Vec<A> {
-        match e.children[..] {
-            [] => vec![f(e)],
-            ref cs => cs
-                .iter()
-                .fold(vec![], |_a: Vec<A>, c: &Element| fold_element_leaves(c, &f)),
-        }
-    }
-
-    fn text_names<'a>(el: &'a Element) -> Vec<(Cow<'a, str>, Cow<'a, str>)> {
-        fold_element_leaves(el, text_name)
-            .into_iter()
-            .filter_map(|x| x)
-            .collect()
-    }
-
-    fn text_name<'a>(e: &'a Element) -> Option<(Cow<'a, str>, Cow<'a, str>)> {
-        e.text
-            .as_ref()
-            .map(|ref t| (Cow::from(&e.name), Cow::from(&t[..])))
-    }
-
-    Ok(metadata)
-}
+/*
+ *pub fn get_metadata(doc: &Document) -> Result<Vec<(String, String)>> {
+ *    let catalog = doc.catalog().error("Couldn’t access catalog")?;
+ *
+ *    let metadata = catalog
+ *        .get("Metadata")
+ *        .and_then(Object::as_reference)
+ *        .error("Couldn’t identify metadata")
+ *        .and_then(|r| {
+ *            doc.get_object(r)
+ *                .and_then(Object::as_stream)
+ *                .error("Couldn’t access metadata")
+ *        })
+ *        .map(|s| &s.content)
+ *        //.and_then(|s| str::from_utf8(&s[54..]).error("Couldn’t decode utf8"))?;
+ *        .and_then(|s| Element::parse(&s[54..]).chain_err(|| "Couldn’t read xml"))
+ *        .map(|e| text_names(&e).into_iter().map(|(n,t)| (n.into_owned(), t.into_owned())).collect())?;
+ *
+ *        //fn decode_stream(s: &Stream) -> Result<content::Content> {
+ *            //s.decode_content().error("Couldn’t parse content stream")
+ *        //}
+ *
+ *        //fn chain_leaves<A>(e: &Element) -> impl Iterator<Item = &Element> {
+ *            //match e.children[..] {
+ *                //[] => iter::once(e),
+ *                ////ref cs => cs.iter().fold(iter::empty(), |a, c| a.chain(chain_leaves(c)).collect()),
+ *                //// TODO
+ *                //ref cs => cs.iter().flat_map(|it| it.clone()a.chain(chain_leaves(c)).collect()),
+ *            //}
+ *        //}
+ *
+ *    fn fold_element_leaves<'a, A>(e: &'a Element, f: impl Fn(&'a Element) -> A) -> Vec<A> {
+ *        match e.children[..] {
+ *            [] => vec![f(e)],
+ *            ref cs => cs
+ *                .iter()
+ *                .fold(vec![], |_a: Vec<A>, c: &Element| fold_element_leaves(c, &f)),
+ *        }
+ *    }
+ *
+ *    fn text_names<'a>(el: &'a Element) -> Vec<(Cow<'a, str>, Cow<'a, str>)> {
+ *        fold_element_leaves(el, text_name)
+ *            .into_iter()
+ *            .filter_map(|x| x)
+ *            .collect()
+ *    }
+ *
+ *    fn text_name<'a>(e: &'a Element) -> Option<(Cow<'a, str>, Cow<'a, str>)> {
+ *        e.text
+ *            .as_ref()
+ *            .map(|ref t| (Cow::from(&e.name), Cow::from(&t[..])))
+ *    }
+ *
+ *    Ok(metadata)
+ *}
+ */
 
 /// Pretty print a date, formatted in the pdf trailer
 fn display_trail_date(s: &str) -> Result<String> {

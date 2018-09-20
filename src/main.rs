@@ -142,13 +142,13 @@ mod options {
 
         #[structopt(name = "burst")]
         Burst {
-            #[structopt(parse(from_os_str))]
+            #[structopt(parse(from_os_str = "PDFName::parse"))]
             inputs: Vec<PDFName>,
         },
 
         #[structopt(name = "info")]
         Info {
-            #[structopt(parse(from_os_str))]
+            #[structopt(parse(from_os_str = "PDFName::parse"))]
             inputs: Vec<PDFName>,
         },
     }

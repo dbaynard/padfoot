@@ -5,10 +5,12 @@
 extern crate error_chain;
 
 extern crate itertools;
+extern crate linked_hash_map;
 
 extern crate chrono;
 extern crate xmltree;
 
+#[macro_use]
 extern crate lopdf;
 
 use std::{fmt, fmt::Display};
@@ -58,7 +60,7 @@ pub fn padfoot(c: Command) -> Result<()> {
     match c {
         Command::Sel(i) => sel(i),
         Command::Zip(_) => Err("Not implemented yet".into()),
-        Command::Burst(_) => Err("Not implemented yet".into()),
+        Command::Burst(i) => burst(&i),
         Command::Info(i) => info(&i),
     }
 }
