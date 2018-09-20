@@ -196,8 +196,6 @@ pub fn burst(input: &[PDFName]) -> Result<()> {
 
                 let pages_id = new.new_object_id();
 
-                let old_page = doc.get_object(oid).error("Couldn’t locate page object")?;
-
                 let old_page_d = doc
                     .get_dictionary(oid)
                     .error("Couldn’t locate page dictionary")?;
@@ -206,9 +204,9 @@ pub fn burst(input: &[PDFName]) -> Result<()> {
                     .get("MediaBox")
                     .error("Couldn’t get media box")?;
 
-                let new_page = PDFTree::new(&doc, old_page, oid);
+                let new_page = PDFTree::new(oid, &doc)?;
 
-                let page_id = new_page.reference(&mut new);
+                let page_id = new_page.link_reference(&mut new);
 
                 let pages = dictionary! {
                     "Type" => "Pages",
