@@ -37,6 +37,7 @@ pub enum PDFTree<'a> {
     Stream(&'a Stream),
     Reference(ObjectId),
     SubTree(Box<PDFTree<'a>>),
+    Parent,
 }
 
 impl<'a> PDFTree<'a> {
@@ -89,14 +90,14 @@ impl<'a> PDFTree<'a> {
 
     /// Fold a `PDFTree` into the supplied `lopdf::Document`, providing the `lopdf::ObjectId` of
     /// the `lopdf::Object` corresponding to the root of the `PDFTree`.
-    pub fn link_reference(&self, doc: &mut Document) -> ObjectId {
+    pub fn link_reference(&self, doc: &mut Document, parent: &ObjectId) -> ObjectId {
         let new_id = doc.new_object_id();
-        let new_object = self.fold(doc);
+        let new_object = self.fold(doc, parent, &new_id);
         doc.objects.insert(new_id, new_object);
         new_id
     }
 
-    fn fold(&self, doc: &mut Document) -> Object {
+    fn fold(&self, doc: &mut Document, parent: &ObjectId, id: &ObjectId) -> Object {
         match self {
             PDFTree::Null => Object::Null,
             PDFTree::Boolean(b) => Object::Boolean(*b),
@@ -105,17 +106,18 @@ impl<'a> PDFTree<'a> {
             PDFTree::Name(v) => Object::Name(v.to_vec()),
             PDFTree::String(v, f) => Object::String(v.to_vec(), (*f).clone()),
             PDFTree::Array(v) => {
-                let arr = v.iter().map(|x| x.fold(doc)).collect();
+                let arr = v.iter().map(|x| x.fold(doc, parent, id)).collect();
                 Object::Array(arr)
             }
-            PDFTree::Dictionary(d) => d.fold(doc),
+            PDFTree::Dictionary(d) => d.fold(doc, parent, id),
             PDFTree::Stream(s) => Object::Stream((*s).clone()),
             // TODO This is wrong; it inserts a reference to an object in the old structure.
             PDFTree::Reference(oid) => Object::Reference(*oid),
             PDFTree::SubTree(tree) => {
-                let oid = tree.link_reference(doc);
+                let oid = tree.link_reference(doc, id);
                 Object::Reference(oid)
             }
+            PDFTree::Parent => Object::Reference(*parent),
         }
     }
 }
@@ -125,8 +127,6 @@ impl<'a> PDFTree<'a> {
 ///
 /// This is much like a `lopdf::Dictionary` except it only contains references, and it forms part
 /// of the mutually recursive structure with the `PDFTree`.
-///
-/// TODO It currently `/Parent` keys. These should be propagated (somehow).
 ///
 /// Like for the `PDFTree`, the lifetime corresponds to the lifetime of the associated
 /// `lopdf::Document`.
@@ -142,7 +142,7 @@ impl<'a> PDFDictionary<'a> {
             dict.insert(
                 s,
                 match s {
-                    "Parent" => PDFTree::Null,
+                    "Parent" => PDFTree::Parent,
                     _ => PDFTree::unfold(doc, seen, o),
                 },
             );
@@ -151,11 +151,11 @@ impl<'a> PDFDictionary<'a> {
         PDFDictionary(dict)
     }
 
-    fn fold(&self, doc: &mut Document) -> Object {
+    fn fold(&self, doc: &mut Document, parent: &ObjectId, id: &ObjectId) -> Object {
         let mut dict = Dictionary::new();
         self.0
             .iter()
-            .for_each(|(&s, tree)| dict.set(s.clone(), tree.fold(doc)));
+            .for_each(|(&s, tree)| dict.set(s.clone(), tree.fold(doc, parent, id)));
         Object::Dictionary(dict)
     }
 }

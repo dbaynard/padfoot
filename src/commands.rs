@@ -198,15 +198,11 @@ pub fn burst(input: &[PDFName]) -> Result<()> {
 
                 let new_page = PDFTree::new(oid, &doc)?;
 
-                let page_id = new_page.link_reference(&mut new);
+                let page_id = new_page.link_reference(&mut new, &pages_id);
 
                 let pages = new_pages_dict(&[page_id]);
 
                 new.objects.insert(pages_id, Object::Dictionary(pages));
-
-                new.get_object_mut(page_id)
-                    .and_then(Object::as_dict_mut)
-                    .map(|d| d.set("Parent", pages_id));
 
                 make_catalog(&mut new, &pages_id);
 
