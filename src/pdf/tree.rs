@@ -90,8 +90,10 @@ impl<'a> PDFTree<'a> {
     /// Fold a `PDFTree` into the supplied `lopdf::Document`, providing the `lopdf::ObjectId` of
     /// the `lopdf::Object` corresponding to the root of the `PDFTree`.
     pub fn link_reference(&self, doc: &mut Document) -> ObjectId {
+        let new_id = doc.new_object_id();
         let new_object = self.fold(doc);
-        doc.add_object(new_object)
+        doc.objects.insert(new_id, new_object);
+        new_id
     }
 
     fn fold(&self, doc: &mut Document) -> Object {
