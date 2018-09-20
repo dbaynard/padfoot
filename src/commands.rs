@@ -200,11 +200,7 @@ pub fn burst(input: &[PDFName]) -> Result<()> {
 
                 let page_id = new_page.link_reference(&mut new);
 
-                let pages = dictionary! {
-                    "Type" => "Pages",
-                    "Kids" => vec![page_id.into()],
-                    "Count" => 1,
-                };
+                let pages = new_pages_dict(&[page_id]);
 
                 new.objects.insert(pages_id, Object::Dictionary(pages));
 
@@ -212,12 +208,7 @@ pub fn burst(input: &[PDFName]) -> Result<()> {
                     .and_then(Object::as_dict_mut)
                     .map(|d| d.set("Parent", pages_id));
 
-                let catalog_id = new.add_object(dictionary! {
-                    "Type" => "Catalog",
-                    "Pages" => pages_id,
-                });
-
-                new.trailer.set("Root", catalog_id);
+                make_catalog(&mut new, &pages_id);
 
                 new.compress();
 

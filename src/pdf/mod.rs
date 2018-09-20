@@ -12,6 +12,25 @@ use errors::*;
 pub mod tree;
 pub use self::tree::*;
 
+/// Create pages dictionary
+pub fn new_pages_dict(v: &[ObjectId]) -> Dictionary {
+    dictionary! {
+        "Type" => "Pages",
+        "Kids" => v.into_iter().map(|oid| Object::from(*oid)).collect::<Vec<_>>(),
+        "Count" => Object::from(v.len() as u32),
+    }
+}
+
+/// Create and insert catalogue, supplying the `ObjectId` of the Pages dictionary.
+pub fn make_catalog(doc: &mut Document, pages_id: &ObjectId) {
+    let catalog_id = doc.add_object(dictionary! {
+        "Type" => "Catalog",
+        "Pages" => *pages_id,
+    });
+
+    doc.trailer.set("Root", catalog_id);
+}
+
 /// Pretty print a simple object
 pub fn simple_display_object<'a>(doc: &'a Document, o: &'a Object) -> Result<String> {
     use lopdf::Object::*;
