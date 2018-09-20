@@ -134,10 +134,16 @@ impl<'a> PDFDictionary<'a> {
     fn new(doc: &'a Document, seen: &mut BTreeSet<ObjectId>, d: &'a Dictionary) -> Self {
         let mut dict = LinkedHashMap::new();
 
-        d.iter().for_each(|(s, o)| {
-            if s != "Parent" {
-                dict.insert(s.as_ref(), PDFTree::unfold(doc, seen, o));
-            }
+        d.iter().for_each(|(s0, o)| {
+            let s = s0.as_ref();
+
+            dict.insert(
+                s,
+                match s {
+                    "Parent" => PDFTree::Null,
+                    _ => PDFTree::unfold(doc, seen, o),
+                },
+            );
         });
 
         PDFDictionary(dict)
