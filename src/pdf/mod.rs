@@ -22,13 +22,15 @@ pub fn new_pages_dict(v: &[ObjectId]) -> Dictionary {
 }
 
 /// Create and insert catalogue, supplying the `ObjectId` of the Pages dictionary.
-pub fn make_catalog(doc: &mut Document, pages_id: &ObjectId) {
+pub fn make_catalog(doc: &mut Document, pages_id: &ObjectId) -> ObjectId {
     let catalog_id = doc.add_object(dictionary! {
         "Type" => "Catalog",
         "Pages" => *pages_id,
     });
 
     doc.trailer.set("Root", catalog_id);
+
+    catalog_id
 }
 
 /// Pretty print a simple object
