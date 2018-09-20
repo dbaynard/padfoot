@@ -220,6 +220,10 @@ pub fn burst(input: &[PDFName]) -> Result<()> {
 
                 new.objects.insert(pages_id, Object::Dictionary(pages));
 
+                new.get_object_mut(page_id)
+                    .and_then(Object::as_dict_mut)
+                    .map(|d| d.set("Parent", pages_id));
+
                 let catalog_id = new.add_object(dictionary! {
                     "Type" => "Catalog",
                     "Pages" => pages_id,
