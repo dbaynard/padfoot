@@ -13,10 +13,10 @@ name = "padfoot"
 path = "src/main.rs"
 
 [dependencies]
-lopdf = "0.15.3"
+lopdf = "0.17.0"
 error-chain = "0.12.0"
 structopt = "0.2.10"
-combine = "3.5.1"
+combine = "3.5.2"
 itertools = "0.7.8"
 xmltree = "0.8.0"
 chrono = "0.4.6"
