@@ -181,6 +181,14 @@ pub fn burst(input: &[PDFName]) -> Result<()> {
 
         let name_prefix = name.file_stem();
 
+        let old_info = &doc
+            .trailer
+            .get("Info")
+            .and_then(Object::as_reference)
+            .error("Couldn’t get info")?;
+
+        let info = PDFTree::new(*old_info, &doc)?;
+
         // Prefix and suffix, plus `_` and ".pdf"
         // TODO check overflow?
         let print_name_width = name_prefix.as_os_str().len() + print_suffix_width + 5;
@@ -205,6 +213,13 @@ pub fn burst(input: &[PDFName]) -> Result<()> {
                 new.objects.insert(pages_id, Object::Dictionary(pages));
 
                 make_catalog(&mut new, &pages_id);
+
+                let trail_info_id = new.new_object_id();
+
+                // TODO no parent
+                let trail_info = info.link_reference(&mut new, &trail_info_id);
+
+                new.trailer.set("Info", trail_info);
 
                 new.compress();
 
