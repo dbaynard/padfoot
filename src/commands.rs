@@ -196,14 +196,6 @@ pub fn burst(input: &[PDFName]) -> Result<()> {
 
                 let pages_id = new.new_object_id();
 
-                let old_page_d = doc
-                    .get_dictionary(oid)
-                    .error("Couldn’t locate page dictionary")?;
-
-                let media_box = old_page_d
-                    .get("MediaBox")
-                    .error("Couldn’t get media box")?;
-
                 let new_page = PDFTree::new(oid, &doc)?;
 
                 let page_id = new_page.link_reference(&mut new);
@@ -212,8 +204,6 @@ pub fn burst(input: &[PDFName]) -> Result<()> {
                     "Type" => "Pages",
                     "Kids" => vec![page_id.into()],
                     "Count" => 1,
-                    //"Resources" => resources_id,
-                    "MediaBox" => media_box.clone(),
                 };
 
                 new.objects.insert(pages_id, Object::Dictionary(pages));
