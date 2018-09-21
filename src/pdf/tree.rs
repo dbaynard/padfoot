@@ -32,7 +32,7 @@ pub enum PDFTree<'a> {
     Real(f64),
     Name(&'a [u8]),
     String(&'a [u8], &'a StringFormat),
-    Array(Vec<Box<PDFTree<'a>>>),
+    Array(Vec<PDFTree<'a>>),
     Dictionary(Box<PDFDictionary<'a>>),
     Stream(&'a Stream),
     Reference(ObjectId),
@@ -65,10 +65,7 @@ impl<'a> PDFTree<'a> {
             Object::Name(v) => PDFTree::Name(v.as_ref()),
             Object::String(v, f) => PDFTree::String(v.as_ref(), f),
             Object::Array(v) => {
-                let arr = v
-                    .iter()
-                    .map(|x| Box::new(PDFTree::unfold(doc, seen, x)))
-                    .collect();
+                let arr = v.iter().map(|x| PDFTree::unfold(doc, seen, x)).collect();
                 PDFTree::Array(arr)
             }
             Object::Dictionary(d) => {
