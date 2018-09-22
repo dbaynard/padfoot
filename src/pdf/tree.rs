@@ -1,6 +1,6 @@
 //! An intermediate tree representation of PDFs
 
-use std::{collections::btree_set::BTreeSet, str};
+use std::{collections::btree_set::BTreeSet, rc::Rc, str};
 
 use linked_hash_map::LinkedHashMap;
 
@@ -36,7 +36,7 @@ pub enum PDFTree<'a> {
     Dictionary(Box<PDFDictionary<'a>>),
     Stream(&'a Stream),
     Reference(ObjectId),
-    SubTree(Box<PDFTree<'a>>),
+    SubTree(Rc<PDFTree<'a>>),
     Parent,
 }
 
@@ -53,7 +53,9 @@ impl<'a> PDFTree<'a> {
         let mut seen = BTreeSet::new();
         seen.insert(oid);
 
-        Ok(PDFTree::unfold(doc, &mut seen, o))
+        let tree = PDFTree::unfold(doc, &mut seen, o);
+
+        Ok(tree)
     }
 
     fn unfold(doc: &'a Document, seen: &mut BTreeSet<ObjectId>, o: &'a Object) -> Self {
@@ -78,7 +80,7 @@ impl<'a> PDFTree<'a> {
                 false => {
                     seen.insert(*oid);
                     doc.get_object(*oid)
-                        .map(|x| PDFTree::SubTree(Box::new(PDFTree::unfold(doc, seen, x))))
+                        .map(|x| PDFTree::SubTree(Rc::new(PDFTree::unfold(doc, seen, x))))
                         .unwrap_or_else(|| PDFTree::Null)
                 }
             },
